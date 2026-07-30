@@ -982,7 +982,10 @@ Resources:
           CAMPAIGN_MODEL_ID: !Ref CampaignModelId
           CAMPAIGN_MODEL_ENDPOINT: !Ref CampaignModelEndpoint
           CAMPAIGN_MODEL_PROJECT_ID: !Ref CampaignMantleProject
-          CAMPAIGN_MODEL_API_KEY_SECRET_ARN: !Ref CampaignModelApiKeySecretArn
+          CAMPAIGN_MODEL_API_KEY_SECRET_ARN: !If
+            - UseCampaignModelApiKey
+            - !Ref CampaignModelApiKeySecretArn
+            - !Ref BedrockApiKeySecret
           CAMPAIGN_MODEL_READ_TIMEOUT_SECONDS: '120'
           CAMPAIGN_IMAGE_MODEL_ID: !Ref CampaignImageModelId
           CAMPAIGN_IMAGE_MODEL_PROJECT_ID: !Ref CampaignMantleProject
@@ -1052,6 +1055,11 @@ Resources:
                   - secretsmanager:GetSecretValue
                 Resource: !Ref CampaignImageModelApiKeySecretArn
           - !Ref AWS::NoValue
+        - Statement:
+            - Effect: Allow
+              Action:
+                - secretsmanager:GetSecretValue
+              Resource: !Ref BedrockApiKeySecret
         - Statement:
             - Effect: Allow
               Action:
