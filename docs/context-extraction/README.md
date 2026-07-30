@@ -27,7 +27,6 @@ Without both layers, the agents produce generic content that needs heavy manual 
 | File | Purpose | Prompt |
 |------|---------|--------|
 | `docs/agentic/context/personal-voice.md` | Alan's writing voice — tone, humour, directness, natural phrases | [05-personal-voice.md](05-personal-voice.md) |
-| `docs/agentic/context/dj-toohey-style.md` | DJ Toohey's on-air presenter style — intros, pacing, banter, references | [06-dj-toohey-style.md](06-dj-toohey-style.md) |
 | `docs/agentic/context/muddys-venue-context.md` | Muddy's Music Cafe — what it is, community, culture, Second Life context | [07-muddys-venue-context.md](07-muddys-venue-context.md) |
 | `docs/agentic/context/radio-read-examples.md` | Golden examples of radio reads that sound right | [08-radio-read-examples.md](08-radio-read-examples.md) |
 | `docs/agentic/context/infographic-style-examples.md` | Infographic copy direction — headlines, chart story, movement language | [09-infographic-style-examples.md](09-infographic-style-examples.md) |
