@@ -53,7 +53,7 @@ Help me define the copy style. I'll provide examples or preferences, and you syn
 
 ---
 
-After I answer, synthesise into a markdown document with:
+Synthesise into a markdown document with:
 - Style rules per text element (headline, subhead, chart story, badges, stats, footer)
 - Character/word limits for each
 - 3-5 example headlines and chart stories I'd approve

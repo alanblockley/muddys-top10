@@ -81,7 +81,7 @@ Specific phrases that are dead giveaways of AI writing:
 
 ---
 
-After I answer, format as a strict reference document with:
+Format as a strict reference document with:
 - Category headers
 - Specific banned phrases/words (in a list)
 - Why each is banned (brief note)

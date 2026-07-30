@@ -56,7 +56,7 @@ For each category:
 - Star (⭐) the ones that are most "me"
 - Note any that should only be used sparingly (reserved for big moments)
 
-After I answer, format as a markdown vocabulary reference grouped by category, with usage notes.
+Format as a markdown vocabulary reference grouped by category, with usage notes.
 ```
 
 ---

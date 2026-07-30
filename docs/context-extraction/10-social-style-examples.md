@@ -44,7 +44,7 @@ I post to: Facebook (group/page), Discord (community server), and Primfeed (Seco
 
 ---
 
-Questions for me:
+Questions:
 
 1. Show me 3-5 social posts you've written about the chart that you were happy with. (If you don't have them, describe what you'd write for a hypothetical chart week.)
 
@@ -58,7 +58,7 @@ Questions for me:
 
 ---
 
-After I answer, format as a markdown document with:
+Format as a markdown document with:
 - Platform-specific sections (Facebook, Discord, Primfeed, Teasers)
 - 2-3 golden examples per platform
 - Anti-examples (what sounds wrong)
