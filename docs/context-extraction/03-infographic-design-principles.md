@@ -4,67 +4,87 @@
 
 ---
 
+## Context for You (Alan)
+
+The current system has two infographic paths:
+1. **Image generation** (preferred) — model sees a reference PNG + chart data → produces a new PNG
+2. **HTML/CSS + Playwright** (fallback) — model writes code → headless browser renders it
+
+When you made infographics with ChatGPT, you were using the image generation approach (either explicitly or through GPT-4o's multimodal capabilities). That's why they were consistent — the model was *seeing* the reference and reproducing the visual style while changing the data.
+
+This prompt extracts what ChatGPT was doing right so the automated system can replicate it.
+
+---
+
 ## Paste this into ChatGPT:
 
 ```
-I'm building an AI system that generates weekly music chart infographics (1280×720 PNG images). The AI needs to understand visual design principles specific to chart/ranking infographics so it can author professional HTML/CSS layouts.
+I've been using you (ChatGPT) to create weekly music chart infographics for my Top 10 show. They've been consistently professional-looking and on-brand. I'm now automating this with an AI system that will use image generation (a model sees a reference PNG + structured chart data and produces a new PNG).
 
-Please write a reference document covering:
+I need you to help me document WHY the infographics you've been creating work — the design principles you've been applying — so I can give that knowledge to another model as context.
 
-## 1. Visual Hierarchy for Rankings
-- How to make #1 visually dominant without overwhelming the layout
-- Graduated emphasis (top positions get more visual weight)
-- How movement indicators (up/down/new/same) should be sized and positioned
-- Balance between data density and readability at the target resolution
+[ATTACH 2-3 OF YOUR BEST INFOGRAPHIC PNGS FROM samples/ HERE]
 
-## 2. Typography for Chart Graphics
-- Font pairing principles (display vs body, condensed for data-heavy layouts)
-- Sizing hierarchy: title > subtitle > position numbers > track names > metadata
-- How to handle long track names and artist names (truncation vs wrapping vs font scaling)
-- Readable font sizes at 1280×720 (minimum sizes that work when shared on social media)
-- When to use uppercase vs title case vs sentence case
+Looking at the infographics you've created for me, please analyse and document:
 
-## 3. Colour Usage in Music/Entertainment Graphics
-- Dark backgrounds for impact and social media visibility
-- Accent colours for movement indicators (standard conventions: green=up, red=down, yellow/gold=new, grey=same)
-- How to use a limited palette (5-6 colours max) effectively
-- Contrast ratios for accessibility on social media
-- Neon/vibrant palettes for nightlife/music contexts
-- How colour temperature creates mood (warm=energy, cool=sophistication)
+## 1. Visual Structure
+- What's the layout grid? (Where are the major regions positioned?)
+- How is visual hierarchy established? (What's biggest/most prominent → smallest)
+- How does the eye travel across the image? (Reading flow)
+- What's the ratio of content area to whitespace/breathing room?
 
-## 4. Layout Principles for 16:9 Chart Graphics
-- Grid-based composition for 1280×720
-- Safe zones (social media crops differently per platform)
-- How to structure: header region, main chart area, supporting stats, footer/promotion
-- White space management when displaying 10 ranked items
-- Where to place branding elements (logo, tagline) without competing with content
+## 2. Consistency Mechanisms
+- What elements NEVER change week-to-week? (Logo position, background, structural panels)
+- What elements change ONLY in content? (Chart rows — same size/position, different text)
+- What elements can vary for editorial emphasis? (Chart Talk, callouts, featured story)
+- How do you maintain brand recognition across weeks while avoiding staleness?
 
-## 5. Information Design for Charts
-- What metadata to show per track (rank, artist, title, play count, movement, weeks on chart)
-- What to omit (too much data = noise)
-- Supporting statistics that add context (total plays, new entries count, biggest climber)
-- "Chart story" as a visual callout (1-2 sentences highlighting the week's narrative)
-- How movement arrows/icons communicate at a glance
+## 3. Typography Decisions
+- How many font sizes are in play? List them by role.
+- What's the hierarchy? (Title > position numbers > artist names > metadata > labels)
+- How do you handle long artist/track names without breaking the layout?
+- What creates the "professional" feel vs "amateur" feel in type choices?
 
-## 6. Social Media Optimisation
-- How these graphics appear in feeds (Facebook preview crops, Discord embeds, mobile vs desktop)
-- Text legibility at thumbnail size
-- Why bold contrast matters more than subtlety for social sharing
-- Aspect ratio considerations (1280×720 is 16:9 — good for Discord/Twitter, acceptable for Facebook, not ideal for Instagram stories)
+## 4. Colour Strategy
+- What's the colour palette and what role does each colour play?
+- How do movement indicators use colour for instant recognition?
+- How does the dark background create contrast and mood?
+- What colour accents draw attention to the week's story?
 
-## 7. Professional vs Amateur Tells
-- What makes a chart graphic look professional (consistent spacing, alignment, intentional hierarchy)
-- Common mistakes (too many fonts, inconsistent spacing, poor contrast, cluttered layout)
-- How consistency week-to-week builds brand recognition
-- When variation is good (content emphasis) vs bad (inconsistent structure)
+## 5. Data Visualisation Choices
+- How do you decide what to emphasise vs what's secondary?
+- How do movement indicators communicate at a glance (without reading)?
+- What supporting stats add context vs which would be clutter?
+- How does the "Chart Talk" section tell the week's story visually?
 
-Write this as a reference document an AI will use when authoring HTML/CSS for chart infographics. Focus on actionable principles, not theory. Use specific measurements, ratios, and examples where possible. Markdown format.
+## 6. What Makes It Look Professional
+- What specific things make this look like a published broadcast graphic vs a hobbyist creation?
+- Spacing, alignment, and consistency patterns you're applying
+- How do panel borders/dividers create structure?
+- What gives it the "nightclub / music venue" aesthetic?
+
+## 7. Variation Strategy
+- How do you decide what to feature differently each week?
+- When the chart is boring (few movements), how do you keep the graphic interesting?
+- When there's a big story (new #1, dramatic movement), how do you visually emphasise it?
+- What's the boundary between "acceptable variation" and "broke the brand"?
+
+## 8. Reference Image Contract
+If another AI model receives one of these infographics as a "reference image" along with new chart data, what instructions would you give it to produce a consistent output?
+- What must it preserve exactly?
+- What can it adapt?
+- What are the failure modes to watch for? (text overlapping, wrong colours, missing elements)
+- What resolution/quality expectations apply?
+
+Format this as a design principles document in markdown. Be specific — include pixel estimates, colour hex values, font size relationships, spacing ratios where you can infer them from the reference. This will be used as context for an AI generating new infographics each week.
 ```
 
 ---
 
 ## Notes
 
-- Domain knowledge about visual design, not Muddy's-specific branding.
-- The Muddy's branding (colours, logo, tagline) is already defined in config — this doc teaches the agent *how* to use design elements effectively.
-- Particularly important for the model-authored infographic HTML/CSS path which currently struggles with layout quality.
+- **Upload your best infographic PNGs** from `samples/` when running this prompt — ChatGPT needs to see them to analyse its own design decisions.
+- This replaces the HTML/CSS-focused approach with understanding the *visual intelligence* that made the manual process work.
+- The output feeds into the image generation prompt, not a code renderer.
+- If the image generation path works well with this context, the HTML/CSS fallback becomes a safety net rather than the primary mechanism.
+- You may want to run this twice — once analysing your reference images, once asking "if you had to recreate this from data alone, what would you need to know?"
