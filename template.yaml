@@ -525,6 +525,14 @@ Resources:
               Filters:
                 - Pattern: '{"eventName": ["INSERT"]}'
 
+  # Secrets Manager for Bedrock API Key (campaign model access)
+  BedrockApiKeySecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Sub '${AWS::StackName}-bedrock-api-key'
+      Description: Bedrock long-term API key for campaign model inference via Mantle
+      SecretString: '{"api_key":"PLACEHOLDER_UPDATE_AFTER_DEPLOY"}'
+
   # Secrets Manager for Spotify Refresh Token
   SpotifyRefreshTokenSecret:
     Type: AWS::SecretsManager::Secret
