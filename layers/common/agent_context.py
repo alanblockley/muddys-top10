@@ -12,12 +12,17 @@ AGENT_SPEC_FILES = {
 }
 
 CONTEXT_FILES = [
+    # Domain knowledge (universal chart/radio/design conventions)
+    'radio-chart-show-convention.md',
+    'chart-show-glossary.md',
+    'infographic-design-principles.md',
+    'social-media-music-communities.md',
+    # Personalisation (this show's voice and style)
     'personal-voice.md',
-    'dj-toohey-style.md',
     'muddys-venue-context.md',
-    'social-style-examples.md',
     'radio-read-examples.md',
     'infographic-style-examples.md',
+    'social-style-examples.md',
     'words-and-phrases.md',
     'never-say.md'
 ]
