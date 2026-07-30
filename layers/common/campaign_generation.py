@@ -108,6 +108,61 @@ BRANDING_OPTIONS = {
     }
 }
 
+# --- Section-specific context selection ---
+# Maps each generation section to the context filenames relevant to it.
+# Universal files are included in every section. Section-specific files
+# are only included when generating that section, keeping prompts focused.
+_UNIVERSAL_CONTEXT_FILES = {
+    'personal-voice.md',
+    'muddys-venue-context.md',
+    'words-and-phrases.md',
+    'never-say.md',
+}
+
+SECTION_CONTEXT_MAP = {
+    'radio_reads': _UNIVERSAL_CONTEXT_FILES | {
+        'radio-chart-show-convention.md',
+        'chart-show-glossary.md',
+        'radio-read-examples.md',
+    },
+    'infographic': _UNIVERSAL_CONTEXT_FILES | {
+        'infographic-design-principles.md',
+        'infographic-style-examples.md',
+        'chart-show-glossary.md',
+    },
+    'infographic_asset': _UNIVERSAL_CONTEXT_FILES | {
+        'infographic-design-principles.md',
+        'infographic-style-examples.md',
+    },
+    'social': _UNIVERSAL_CONTEXT_FILES | {
+        'social-media-music-communities.md',
+        'social-style-examples.md',
+        'chart-show-glossary.md',
+    },
+}
+
+# Per-section output token budgets. These override the default max_tokens
+# when generating each section to prevent truncation.
+SECTION_MAX_TOKENS = {
+    'radio_reads': 4096,       # 10 position reads + structural sections
+    'infographic': 3000,       # structured JSON with 10 track cards
+    'infographic_asset': 6000, # complete HTML + CSS for 1280x720 layout
+    'social': 3000,            # multi-platform posts with hashtags
+}
+
+
+def select_context_for_section(personal_context, section_name):
+    """Filter loaded context files to only those relevant to the given section."""
+    relevant_files = SECTION_CONTEXT_MAP.get(section_name)
+    if not relevant_files:
+        # Unknown section — include everything (safe fallback)
+        return personal_context
+    return [
+        item for item in personal_context
+        if any(item['path'].endswith(f) for f in relevant_files)
+    ]
+
+
 DEFAULT_CAMPAIGN_BRANDING = {
     'logo_variant': 'uploaded',
     'logo_s3_key': '',
@@ -564,19 +619,27 @@ def generate_infographic_asset_with_model(
     prompt_refs=None
 ):
     fallback = generate_infographic_asset(chart_brief, infographic, venue_config, infographic_template)
+    section_context = select_context_for_section(personal_context, 'infographic_asset')
     prompt_package = build_infographic_asset_prompt_package(
         chart_brief,
         infographic,
         venue_config,
         infographic_template,
         agent_spec,
-        personal_context,
+        section_context,
         memory_context,
         INFOGRAPHIC_ASSET_SCHEMA,
         prompt_config=prompt_config
     )
     if prompt_refs is not None:
         prompt_refs['infographic_asset'] = prompt_package['ref']
+
+    # Override token budget for infographic asset generation
+    section_tokens = SECTION_MAX_TOKENS.get('infographic_asset')
+    original_max_tokens = model_client.max_tokens
+    if section_tokens:
+        model_client.max_tokens = section_tokens
+
     try:
         reference_images = infographic_template_reference_images(infographic_template)
         try:
@@ -616,9 +679,8 @@ def generate_infographic_asset_with_model(
         fallback['metadata']['asset_model'] = getattr(model_client, 'model_id', None)
         fallback['metadata']['model_error'] = str(e)
         return fallback
-
-
-def build_infographic_asset_prompt_package(chart_brief, infographic, venue_config, infographic_template, agent_spec, personal_context, memory_context, schema, prompt_config=None):
+    finally:
+        model_client.max_tokens = original_max_tokens
     variables = prompt_variables(
         'infographic_asset',
         chart_brief,
@@ -1257,18 +1319,26 @@ def generate_section_with_model(
     prompt_config=None,
     prompt_refs=None
 ):
+    section_context = select_context_for_section(personal_context, section_name)
     prompt_package = build_generation_prompt_package(
         section_name,
         chart_brief,
         venue_config,
         agent_spec,
-        personal_context,
+        section_context,
         memory_context,
         schema,
         prompt_config=prompt_config
     )
     if prompt_refs is not None:
         prompt_refs[section_name] = prompt_package['ref']
+
+    # Override token budget for this section if configured
+    section_tokens = SECTION_MAX_TOKENS.get(section_name)
+    original_max_tokens = model_client.max_tokens
+    if section_tokens:
+        model_client.max_tokens = section_tokens
+
     try:
         generated = model_client.complete_json(prompt_package['text'])
         if not isinstance(generated, dict):
@@ -1283,6 +1353,8 @@ def generate_section_with_model(
         fallback['generation_mode'] = 'deterministic_fallback'
         fallback['model_error'] = str(e)
         return fallback
+    finally:
+        model_client.max_tokens = original_max_tokens
 
 
 def enforce_section_quality(section_name, generated, fallback):
