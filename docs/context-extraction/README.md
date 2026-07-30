@@ -17,7 +17,7 @@ Without both layers, the agents produce generic content that needs heavy manual 
 
 | File | Purpose | Prompt |
 |------|---------|--------|
-| `docs/agentic/context/radio-chart-show-conventions.md` | How professional radio chart countdowns work — structure, pacing, tension, reveal patterns | [01-radio-chart-conventions.md](01-radio-chart-conventions.md) |
+| `docs/agentic/context/radio-chart-show-convention.md` | How professional radio chart countdowns work — structure, pacing, tension, reveal patterns | [01-radio-chart-conventions.md](01-radio-chart-conventions.md) ✅ ALREADY POPULATED |
 | `docs/agentic/context/chart-show-glossary.md` | Industry terminology for chart shows and radio broadcasting | [02-chart-show-glossary.md](02-chart-show-glossary.md) |
 | `docs/agentic/context/infographic-design-principles.md` | Visual design principles for music chart infographics | [03-infographic-design-principles.md](03-infographic-design-principles.md) |
 | `docs/agentic/context/social-media-music-communities.md` | How music communities engage on social media, what drives shares/engagement | [04-social-media-music-communities.md](04-social-media-music-communities.md) |
