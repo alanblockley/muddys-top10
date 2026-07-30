@@ -1,0 +1,1532 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Muddy's Music Cafe Top 10 Tracker
+
+Parameters:
+  StreamUrl:
+    Type: String
+    Default: 'http://muddys.digistream.info:20398/7.html'
+    Description: URL to the Shoutcast stream metadata endpoint (supports 7.html or stats?sid=X formats)
+
+  SpotifyClientId:
+    Type: String
+    Default: ''
+    Description: Spotify API Client ID (optional, for track validation)
+    NoEcho: false
+
+  SpotifyClientSecret:
+    Type: String
+    Default: ''
+    Description: Spotify API Client Secret (optional, for track validation)
+    NoEcho: true
+
+  EnableSpotify:
+    Type: String
+    Default: 'false'
+    AllowedValues:
+      - 'true'
+      - 'false'
+    Description: Legacy Spotify feature toggle. Used as fallback when granular Spotify toggles are not set.
+
+  EnableSpotifyValidation:
+    Type: String
+    Default: 'true'
+    AllowedValues:
+      - 'true'
+      - 'false'
+    Description: Enable Spotify as a track validation data source when credentials are configured.
+
+  EnableSpotifyPlaylists:
+    Type: String
+    Default: 'false'
+    AllowedValues:
+      - 'true'
+      - 'false'
+    Description: Enable Spotify OAuth admin UI and playlist generation.
+
+  CustomDomainName:
+    Type: String
+    Default: ''
+    Description: Optional custom domain/CNAME for CloudFront, e.g. top10.example.com
+
+  CloudFrontCertificateArn:
+    Type: String
+    Default: ''
+    Description: Optional ACM certificate ARN for the custom CloudFront domain. Must be in us-east-1.
+
+  CampaignGenerationSchedule:
+    Type: String
+    Default: 'cron(0 2 ? * SAT *)'
+    Description: EventBridge Scheduler expression for weekly campaign draft generation in America/Los_Angeles time. Default is Saturday 02:00 SLT.
+
+  AgentCoreMemoryName:
+    Type: String
+    Default: 'teleport_prod_agentcore_memory'
+    AllowedPattern: '^[a-zA-Z][a-zA-Z0-9_]{0,47}$'
+    Description: Unique AgentCore Memory name for this account and region. Use teleport_ENV_agentcore_memory because AgentCore Memory names cannot contain hyphens.
+
+  AgentCoreMemoryEventExpiryDays:
+    Type: Number
+    Default: 365
+    MinValue: 3
+    MaxValue: 365
+    Description: Number of days to retain AgentCore Memory events.
+
+  AgentCoreRuntimeName:
+    Type: String
+    Default: 'teleport_prod_campaign_agent'
+    AllowedPattern: '^[a-zA-Z][a-zA-Z0-9_]{0,47}$'
+    Description: Unique AgentCore Runtime name. Use teleport_ENV_campaign_agent because runtime names cannot contain hyphens.
+
+  AgentCoreRuntimeArtifactBucket:
+    Type: String
+    Default: 'teleport-prod-agentcore-artifacts-000000000000-us-west-2'
+    Description: S3 bucket containing the AgentCore Runtime direct-code deployment package.
+
+  AgentCoreRuntimeArtifactPrefix:
+    Type: String
+    Default: 'bootstrap/agentcore-runtime/deployment.zip'
+    Description: S3 object key for the AgentCore Runtime direct-code deployment package.
+
+  CampaignModelId:
+    Type: String
+    Default: 'deepseek.v3.2'
+    Description: Bedrock model ID for campaign content generation. Blank uses deterministic draft fallback.
+
+  CampaignModelEndpoint:
+    Type: String
+    Default: 'bedrock-mantle'
+    AllowedValues:
+      - 'bedrock-mantle'
+      - 'bedrock-runtime'
+      - 'strands-openai-responses'
+    Description: Model endpoint family for campaign content generation.
+
+  CampaignModelResourceArn:
+    Type: String
+    Default: ''
+    Description: Optional IAM resource ARN for bedrock-runtime models. Not required for the default bedrock-mantle model.
+
+  CampaignModelApiKeySecretArn:
+    Type: String
+    Default: ''
+    Description: Optional Secrets Manager ARN containing a Bedrock/Mantle API key for the Strands OpenAI Responses provider.
+
+  CampaignImageModelId:
+    Type: String
+    Default: ''
+    Description: Optional OpenAI Responses compatible image-generation model ID for direct campaign infographic PNG generation. Blank uses the Playwright renderer.
+
+  CampaignImageModelApiKeySecretArn:
+    Type: String
+    Default: ''
+    Description: Optional Secrets Manager ARN containing the image model API key. Blank reuses CampaignModelApiKeySecretArn.
+
+  CampaignImageSize:
+    Type: String
+    Default: '1280x720'
+    Description: Requested image generation size for campaign infographic PNGs.
+
+  LambdaArchitecture:
+    Type: String
+    Default: 'x86_64'
+    AllowedValues:
+      - 'x86_64'
+      - 'arm64'
+    Description: Lambda CPU architecture. Use x86_64 for local x86 container builds, arm64 for Graviton deployments from compatible build hosts.
+
+Conditions:
+  SpotifyEnabled: !Equals [!Ref EnableSpotifyPlaylists, 'true']
+  UseCustomCloudFrontDomain: !And
+    - !Not [!Equals [!Ref CustomDomainName, '']]
+    - !Not [!Equals [!Ref CloudFrontCertificateArn, '']]
+  UseCampaignModel: !Not [!Equals [!Ref CampaignModelId, '']]
+  UseMantleCampaignModel: !And
+    - !Condition UseCampaignModel
+    - !Equals [!Ref CampaignModelEndpoint, 'bedrock-mantle']
+  UseRuntimeCampaignModel: !And
+    - !Not [!Equals [!Ref CampaignModelId, '']]
+    - !Not [!Equals [!Ref CampaignModelResourceArn, '']]
+    - !Equals [!Ref CampaignModelEndpoint, 'bedrock-runtime']
+  UseCampaignModelApiKey: !Not [!Equals [!Ref CampaignModelApiKeySecretArn, '']]
+  UseCampaignImageModelApiKey: !Not [!Equals [!Ref CampaignImageModelApiKeySecretArn, '']]
+
+Globals:
+  Function:
+    Runtime: python3.14
+    Architectures:
+      - !Ref LambdaArchitecture
+    Timeout: 30
+    MemorySize: 256
+    Environment:
+      Variables:
+        TRACKS_TABLE: !Ref TracksTable
+        CONFIG_TABLE: !Ref ConfigTable
+        CHART_HISTORY_TABLE: !Ref ChartHistoryTable
+        CAMPAIGNS_TABLE: !Ref ChartCampaignsTable
+        STREAM_URL: !Ref StreamUrl
+        ENABLE_SPOTIFY: !Ref EnableSpotify
+
+Resources:
+  # DynamoDB Tables
+  TracksTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub '${AWS::StackName}-tracks'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: pk
+          AttributeType: S
+        - AttributeName: sk
+          AttributeType: S
+        - AttributeName: timestamp
+          AttributeType: N
+      KeySchema:
+        - AttributeName: pk
+          KeyType: HASH
+        - AttributeName: sk
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: timestamp-index
+          KeySchema:
+            - AttributeName: pk
+              KeyType: HASH
+            - AttributeName: timestamp
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      StreamSpecification:
+        StreamViewType: NEW_IMAGE
+
+  ConfigTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub '${AWS::StackName}-config'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: configKey
+          AttributeType: S
+      KeySchema:
+        - AttributeName: configKey
+          KeyType: HASH
+      StreamSpecification:
+        StreamViewType: NEW_IMAGE
+
+  ChartHistoryTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub '${AWS::StackName}-chart-history'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: pk
+          AttributeType: S
+        - AttributeName: sk
+          AttributeType: S
+      KeySchema:
+        - AttributeName: pk
+          KeyType: HASH
+        - AttributeName: sk
+          KeyType: RANGE
+
+  ChartCampaignsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub '${AWS::StackName}-chart-campaigns'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: pk
+          AttributeType: S
+        - AttributeName: sk
+          AttributeType: S
+        - AttributeName: gsi_pk
+          AttributeType: S
+        - AttributeName: gsi_sk
+          AttributeType: S
+      KeySchema:
+        - AttributeName: pk
+          KeyType: HASH
+        - AttributeName: sk
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: gsi1
+          KeySchema:
+            - AttributeName: gsi_pk
+              KeyType: HASH
+            - AttributeName: gsi_sk
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+
+  CampaignAssetsBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName: !Sub '${AWS::StackName}-campaign-assets-${AWS::AccountId}'
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+
+  CampaignMantleProject:
+    Type: AWS::BedrockMantle::Project
+    Properties:
+      Name: !Ref AWS::StackName
+      Tags:
+        - Key: Application
+          Value: muddys-top10
+        - Key: StackName
+          Value: !Ref AWS::StackName
+        - Key: Workload
+          Value: campaign-generation
+
+  AgenticMemory:
+    Type: AWS::BedrockAgentCore::Memory
+    Properties:
+      Name: !Ref AgentCoreMemoryName
+      Description: AgentCore Memory for Muddy's weekly chart campaign editorial recall
+      EventExpiryDuration: !Ref AgentCoreMemoryEventExpiryDays
+      IndexedKeys:
+        - Key: week_id
+          Type: STRING
+        - Key: content_type
+          Type: STRING
+        - Key: status
+          Type: STRING
+      MemoryStrategies:
+        - SemanticMemoryStrategy:
+            Name: CampaignEditorialMemory
+            Description: Extract reusable editorial context from weekly campaign drafts and review outcomes.
+            NamespaceTemplates:
+              - /muddys/chart-campaigns
+
+  AgentCoreRuntimeRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: AllowBedrockAgentCoreAssumeRole
+            Effect: Allow
+            Principal:
+              Service: bedrock-agentcore.amazonaws.com
+            Action: sts:AssumeRole
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Ref AWS::AccountId
+              ArnLike:
+                aws:SourceArn: !Sub 'arn:aws:bedrock-agentcore:${AWS::Region}:${AWS::AccountId}:*'
+      Policies:
+        - PolicyName: AgentCoreRuntimeExecution
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                Resource: !Sub 'arn:aws:s3:::${AgentCoreRuntimeArtifactBucket}/${AgentCoreRuntimeArtifactPrefix}'
+              - Effect: Allow
+                Action:
+                  - lambda:InvokeFunction
+                Resource: !GetAtt AgentCoreToolsFunction.Arn
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:*'
+
+  CampaignAgentRuntime:
+    Type: AWS::BedrockAgentCore::Runtime
+    Properties:
+      AgentRuntimeName: !Ref AgentCoreRuntimeName
+      Description: AgentCore Runtime orchestration layer for Muddy's weekly chart campaigns
+      AgentRuntimeArtifact:
+        CodeConfiguration:
+          Code:
+            S3:
+              Bucket: !Ref AgentCoreRuntimeArtifactBucket
+              Prefix: !Ref AgentCoreRuntimeArtifactPrefix
+          Runtime: PYTHON_3_14
+          EntryPoint:
+            - main.py
+      NetworkConfiguration:
+        NetworkMode: PUBLIC
+      ProtocolConfiguration: HTTP
+      RoleArn: !GetAtt AgentCoreRuntimeRole.Arn
+      EnvironmentVariables:
+        AGENTCORE_TOOLS_FUNCTION_NAME: !Ref AgentCoreToolsFunction
+
+  # Cognito User Pool
+  UserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: !Sub '${AWS::StackName}-users'
+      UsernameAttributes:
+        - email
+      AutoVerifiedAttributes:
+        - email
+      EmailConfiguration:
+        EmailSendingAccount: COGNITO_DEFAULT
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 8
+          RequireUppercase: true
+          RequireLowercase: true
+          RequireNumbers: true
+          RequireSymbols: false
+      Schema:
+        - Name: email
+          AttributeDataType: String
+          Required: true
+          Mutable: false
+      UserAttributeUpdateSettings:
+        AttributesRequireVerificationBeforeUpdate:
+          - email
+
+  UserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      ClientName: !Sub '${AWS::StackName}-client'
+      UserPoolId: !Ref UserPool
+      GenerateSecret: false
+      AllowedOAuthFlows:
+        - code
+        - implicit
+      AllowedOAuthScopes:
+        - email
+        - openid
+        - profile
+      AllowedOAuthFlowsUserPoolClient: true
+      CallbackURLs:
+        - !If
+          - UseCustomCloudFrontDomain
+          - !Sub 'https://${CustomDomainName}/index.html'
+          - !Ref AWS::NoValue
+        - !If
+          - UseCustomCloudFrontDomain
+          - !Sub 'https://${CustomDomainName}/admin.html'
+          - !Ref AWS::NoValue
+        - !Sub 'https://${CloudFrontDistribution.DomainName}/index.html'
+        - !Sub 'https://${CloudFrontDistribution.DomainName}/admin.html'
+        - 'http://localhost:8000/index.html'
+        - 'http://localhost:8000/admin.html'
+      LogoutURLs:
+        - !If
+          - UseCustomCloudFrontDomain
+          - !Sub 'https://${CustomDomainName}/index.html'
+          - !Ref AWS::NoValue
+        - !If
+          - UseCustomCloudFrontDomain
+          - !Sub 'https://${CustomDomainName}/admin.html'
+          - !Ref AWS::NoValue
+        - !Sub 'https://${CloudFrontDistribution.DomainName}/index.html'
+        - !Sub 'https://${CloudFrontDistribution.DomainName}/admin.html'
+        - 'http://localhost:8000/index.html'
+        - 'http://localhost:8000/admin.html'
+      SupportedIdentityProviders:
+        - COGNITO
+      AccessTokenValidity: 12
+      IdTokenValidity: 12
+      RefreshTokenValidity: 30
+      TokenValidityUnits:
+        AccessToken: hours
+        IdToken: hours
+        RefreshToken: days
+      ExplicitAuthFlows:
+        - ALLOW_USER_SRP_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
+
+  UserPoolDomain:
+    Type: AWS::Cognito::UserPoolDomain
+    Properties:
+      Domain: !Sub '${AWS::StackName}-${AWS::AccountId}'
+      UserPoolId: !Ref UserPool
+
+  # Lambda Layer for shared code
+  CommonLayer:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      LayerName: !Sub '${AWS::StackName}-common'
+      ContentUri: layers/common/
+      CompatibleRuntimes:
+        - python3.14
+      RetentionPolicy: Retain
+    Metadata:
+      BuildMethod: python3.14
+
+  AgentSpecLayer:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      LayerName: !Sub '${AWS::StackName}-agent-spec'
+      ContentUri: docs/
+      CompatibleRuntimes:
+        - python3.14
+      RetentionPolicy: Retain
+
+  # Stream Poller Lambda
+  StreamPollerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub '${AWS::StackName}-stream-poller'
+      CodeUri: src/poller/
+      Handler: app.lambda_handler
+      Layers:
+        - !Ref CommonLayer
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref TracksTable
+        - DynamoDBReadPolicy:
+            TableName: !Ref ConfigTable
+      Events:
+        PollerSchedule:
+          Type: Schedule
+          Properties:
+            Schedule: 'rate(1 minute)'
+            Description: Poll stream every minute
+
+  # Track Validator Lambda
+  TrackValidatorFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub '${AWS::StackName}-track-validator'
+      CodeUri: src/validator/
+      Handler: app.lambda_handler
+      Timeout: 30
+      MemorySize: 512
+      Layers:
+        - !Ref CommonLayer
+      Environment:
+        Variables:
+          SPOTIFY_CLIENT_ID: !Ref SpotifyClientId
+          SPOTIFY_CLIENT_SECRET: !Ref SpotifyClientSecret
+          ENABLE_SPOTIFY: !Ref EnableSpotifyValidation
+          ENABLE_SPOTIFY_VALIDATION: !Ref EnableSpotifyValidation
+          ENABLE_SPOTIFY_PLAYLISTS: !Ref EnableSpotifyPlaylists
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref TracksTable
+        - DynamoDBReadPolicy:
+            TableName: !Ref ConfigTable
+      Events:
+        DynamoDBStream:
+          Type: DynamoDB
+          Properties:
+            Stream: !GetAtt TracksTable.StreamArn
+            StartingPosition: LATEST
+            BatchSize: 10
+            MaximumBatchingWindowInSeconds: 5
+            FilterCriteria:
+              Filters:
+                - Pattern: '{"eventName": ["INSERT"]}'
+
+  # Secrets Manager for Spotify Refresh Token
+  SpotifyRefreshTokenSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Sub '${AWS::StackName}-spotify-refresh-token'
+      Description: Spotify refresh token for playlist creation
+      SecretString: '{"refresh_token":"PLACEHOLDER_UPDATE_AFTER_AUTHORIZATION"}'
+
+  # API Handler Lambda
+  ApiFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub '${AWS::StackName}-api'
+      CodeUri: src/api/
+      Handler: app.lambda_handler
+      Layers:
+        - !Ref CommonLayer
+      Environment:
+        Variables:
+          SPOTIFY_CLIENT_ID: !Ref SpotifyClientId
+          SPOTIFY_CLIENT_SECRET: !Ref SpotifyClientSecret
+          SPOTIFY_REFRESH_TOKEN_SECRET: !Ref SpotifyRefreshTokenSecret
+          ENABLE_SPOTIFY: !Ref EnableSpotifyPlaylists
+          ENABLE_SPOTIFY_VALIDATION: !Ref EnableSpotifyValidation
+          ENABLE_SPOTIFY_PLAYLISTS: !Ref EnableSpotifyPlaylists
+          AGENTCORE_RUNTIME_ARN: !GetAtt CampaignAgentRuntime.AgentRuntimeArn
+          AGENTCORE_RUNTIME_QUALIFIER: DEFAULT
+          CAMPAIGN_GENERATOR_FUNCTION_NAME: !Ref CampaignGeneratorFunction
+          INFOGRAPHIC_RENDERER_FUNCTION_NAME: !Ref InfographicRendererFunction
+          CAMPAIGN_ASSETS_BUCKET: !Ref CampaignAssetsBucket
+          CAMPAIGN_DIAGNOSTICS_MODEL_ID: !Ref CampaignModelId
+          CAMPAIGN_DIAGNOSTICS_MODEL_ENDPOINT: !Ref CampaignModelEndpoint
+          CAMPAIGN_DIAGNOSTICS_MODEL_PROJECT_ID: !Ref CampaignMantleProject
+          CAMPAIGN_DIAGNOSTICS_MODEL_API_KEY_SECRET_ARN: !Ref CampaignModelApiKeySecretArn
+          CAMPAIGN_DIAGNOSTICS_MODEL_MAX_TOKENS: '700'
+          CAMPAIGN_DIAGNOSTICS_MODEL_TEMPERATURE: '0.1'
+          CAMPAIGN_DIAGNOSTICS_MODEL_READ_TIMEOUT_SECONDS: '30'
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref TracksTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref ConfigTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref ChartHistoryTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref ChartCampaignsTable
+        - Statement:
+            - Effect: Allow
+              Action:
+                - secretsmanager:GetSecretValue
+                - secretsmanager:PutSecretValue
+                - secretsmanager:UpdateSecret
+              Resource: !Ref SpotifyRefreshTokenSecret
+            - Effect: Allow
+              Action:
+                - lambda:InvokeFunction
+              Resource: !GetAtt PlaylistGeneratorFunction.Arn
+            - Effect: Allow
+              Action:
+                - lambda:InvokeFunction
+              Resource: !GetAtt CampaignGeneratorFunction.Arn
+            - Effect: Allow
+              Action:
+                - lambda:InvokeFunction
+              Resource: !GetAtt InfographicRendererFunction.Arn
+            - Effect: Allow
+              Action:
+                - s3:GetObject
+                - s3:DeleteObject
+              Resource: !Sub '${CampaignAssetsBucket.Arn}/*'
+            - Effect: Allow
+              Action:
+                - s3:PutObject
+              Resource: !Sub '${CampaignAssetsBucket.Arn}/branding/*'
+            - Effect: Allow
+              Action:
+                - bedrock-agentcore:InvokeAgentRuntime
+              Resource:
+                - !GetAtt CampaignAgentRuntime.AgentRuntimeArn
+                - !Sub
+                  - '${RuntimeArn}/runtime-endpoint/*'
+                  - RuntimeArn: !GetAtt CampaignAgentRuntime.AgentRuntimeArn
+            - Effect: Allow
+              Action:
+                - logs:FilterLogEvents
+              Resource:
+                - !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${AWS::StackName}-api:*'
+                - !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${AWS::StackName}-campaign-generator:*'
+                - !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${AWS::StackName}-agentcore-tools:*'
+                - !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${AWS::StackName}-infographic-renderer:*'
+        - !If
+          - UseRuntimeCampaignModel
+          - Statement:
+              - Effect: Allow
+                Action:
+                  - bedrock:InvokeModel
+                Resource: !Ref CampaignModelResourceArn
+          - !Ref AWS::NoValue
+        - !If
+          - UseMantleCampaignModel
+          - Statement:
+              - Effect: Allow
+                Action:
+                  - bedrock-mantle:CreateInference
+                  - bedrock-mantle:GetProject
+                Resource: !GetAtt CampaignMantleProject.Arn
+          - !Ref AWS::NoValue
+        - !If
+          - UseCampaignModelApiKey
+          - Statement:
+              - Effect: Allow
+                Action:
+                  - secretsmanager:GetSecretValue
+                Resource: !Ref CampaignModelApiKeySecretArn
+          - !Ref AWS::NoValue
+      Events:
+        GetHistory:
+          Type: Api
+          Properties:
+            Path: /api/history
+            Method: GET
+            RestApiId: !Ref ApiGateway
+            Auth:
+              Authorizer: CognitoAuthorizer
+        GetTop10:
+          Type: Api
+          Properties:
+            Path: /api/top10
+            Method: GET
+            RestApiId: !Ref ApiGateway
+            Auth:
+              Authorizer: CognitoAuthorizer
+        GetTop10History:
+          Type: Api
+          Properties:
+            Path: /api/top10/history
+            Method: GET
+            RestApiId: !Ref ApiGateway
+            Auth:
+              Authorizer: CognitoAuthorizer
+        GetTop10HistoryWeek:
+          Type: Api
+          Properties:
+            Path: /api/top10/history/{week_id}
+            Method: GET
+            RestApiId: !Ref ApiGateway
+            Auth:
+              Authorizer: CognitoAuthorizer
+        GetConfig:
+          Type: Api
+          Properties:
+            Path: /api/config
+            Method: GET
+            RestApiId: !Ref ApiGateway
+            Auth:
+              Authorizer: CognitoAuthorizer
+        PutConfig:
+          Type: Api
+          Properties:
+            Path: /api/config
+            Method: PUT
+            RestApiId: !Ref ApiGateway
+            Auth:
+              Authorizer: CognitoAuthorizer
+        PutCampaignLogo:
+          Type: Api
+          Properties:
+            Path: /api/config/logo
+            Method: PUT
+            RestApiId: !Ref ApiGateway
+            Auth:
+              Authorizer: CognitoAuthorizer
+        PostInfographicTemplateReference:
+          Type: Api
+          Properties:
+            Path: /api/config/infographic-template/reference
+            Method: POST
+            RestApiId: !Ref ApiGateway
+            Auth:
+              Authorizer: CognitoAuthorizer
+        GetHealth:
+          Type: Api
+          Properties:
+            Path: /api/health
+            Method: GET
+            RestApiId: !Ref ApiGateway
+            Auth:
+              Authorizer: CognitoAuthorizer
+        SpotifyConnect:
+          Type: Api
+          Properties:
+            Path: /api/spotify/connect
+            Method: GET
+            RestApiId: !Ref ApiGateway
+            Auth:
+              Authorizer: CognitoAuthorizer
+        SpotifyCallback:
+          Type: Api
+          Properties:
+            Path: /api/spotify/callback
+            Method: GET
+            RestApiId: !Ref ApiGateway
+        SpotifyStatus:
+          Type: Api
+          Properties:
+            Path: /api/spotify/status
+            Method: GET
+            RestApiId: !Ref ApiGateway
+            Auth:
+              Authorizer: CognitoAuthorizer
+        SpotifyGeneratePlaylist:
+          Type: Api
+          Properties:
+            Path: /api/spotify/generate-playlist
+            Method: POST
+            RestApiId: !Ref ApiGateway
+            Auth:
+              Authorizer: CognitoAuthorizer
+        SpotifyDisconnect:
+          Type: Api
+          Properties:
+            Path: /api/spotify/disconnect
+            Method: POST
+            RestApiId: !Ref ApiGateway
+            Auth:
+              Authorizer: CognitoAuthorizer
+        ListCampaigns:
+          Type: Api
+          Properties:
+            Path: /api/campaigns
+            Method: GET
+            RestApiId: !Ref ApiGateway
+            Auth:
+              Authorizer: CognitoAuthorizer
+        GenerateCampaign:
+          Type: Api
+          Properties:
+            Path: /api/campaigns/generate
+            Method: POST
+            RestApiId: !Ref ApiGateway
+            Auth:
+              Authorizer: CognitoAuthorizer
+        GetCampaignFeedbackSummary:
+          Type: Api
+          Properties:
+            Path: /api/campaigns/feedback/summary
+            Method: GET
+            RestApiId: !Ref ApiGateway
+            Auth:
+              Authorizer: CognitoAuthorizer
+        ListCampaignRevisionFeedback:
+          Type: Api
+          Properties:
+            Path: /api/campaigns/{week_id}/revisions/{revision_id}/feedback
+            Method: GET
+            RestApiId: !Ref ApiGateway
+            Auth:
+              Authorizer: CognitoAuthorizer
+        CreateCampaignRevisionFeedback:
+          Type: Api
+          Properties:
+            Path: /api/campaigns/{week_id}/revisions/{revision_id}/feedback
+            Method: POST
+            RestApiId: !Ref ApiGateway
+            Auth:
+              Authorizer: CognitoAuthorizer
+        GetCampaignRevision:
+          Type: Api
+          Properties:
+            Path: /api/campaigns/{week_id}/revisions/{revision_id}
+            Method: GET
+            RestApiId: !Ref ApiGateway
+            Auth:
+              Authorizer: CognitoAuthorizer
+        ApproveCampaignRevision:
+          Type: Api
+          Properties:
+            Path: /api/campaigns/{week_id}/revisions/{revision_id}/approve
+            Method: PUT
+            RestApiId: !Ref ApiGateway
+            Auth:
+              Authorizer: CognitoAuthorizer
+        ListCampaignRevisions:
+          Type: Api
+          Properties:
+            Path: /api/campaigns/{week_id}/revisions
+            Method: GET
+            RestApiId: !Ref ApiGateway
+            Auth:
+              Authorizer: CognitoAuthorizer
+        GetCampaign:
+          Type: Api
+          Properties:
+            Path: /api/campaigns/{week_id}
+            Method: GET
+            RestApiId: !Ref ApiGateway
+            Auth:
+              Authorizer: CognitoAuthorizer
+        UpdateCampaign:
+          Type: Api
+          Properties:
+            Path: /api/campaigns/{week_id}
+            Method: PUT
+            RestApiId: !Ref ApiGateway
+            Auth:
+              Authorizer: CognitoAuthorizer
+        DeleteCampaign:
+          Type: Api
+          Properties:
+            Path: /api/campaigns/{week_id}
+            Method: DELETE
+            RestApiId: !Ref ApiGateway
+            Auth:
+              Authorizer: CognitoAuthorizer
+        UpdateCampaignStatus:
+          Type: Api
+          Properties:
+            Path: /api/campaigns/{week_id}/status
+            Method: PUT
+            RestApiId: !Ref ApiGateway
+            Auth:
+              Authorizer: CognitoAuthorizer
+        GetCampaignDiagnostics:
+          Type: Api
+          Properties:
+            Path: /api/campaigns/{week_id}/diagnostics
+            Method: GET
+            RestApiId: !Ref ApiGateway
+            Auth:
+              Authorizer: CognitoAuthorizer
+
+  # Scheduled campaign draft generation, outside Cognito user scope
+  CampaignGeneratorFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub '${AWS::StackName}-campaign-generator'
+      CodeUri: src/campaign-generator/
+      Handler: app.lambda_handler
+      Timeout: 300
+      MemorySize: 512
+      Layers:
+        - !Ref CommonLayer
+      Environment:
+        Variables:
+          AGENTCORE_RUNTIME_ARN: !GetAtt CampaignAgentRuntime.AgentRuntimeArn
+          AGENTCORE_RUNTIME_QUALIFIER: DEFAULT
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref TracksTable
+        - DynamoDBReadPolicy:
+            TableName: !Ref ConfigTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref ChartHistoryTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref ChartCampaignsTable
+        - Statement:
+            - Effect: Allow
+              Action:
+                - bedrock-agentcore:InvokeAgentRuntime
+              Resource:
+                - !GetAtt CampaignAgentRuntime.AgentRuntimeArn
+                - !Sub
+                  - '${RuntimeArn}/runtime-endpoint/*'
+                  - RuntimeArn: !GetAtt CampaignAgentRuntime.AgentRuntimeArn
+
+  CampaignGeneratorAsyncInvokeConfig:
+    Type: AWS::Lambda::EventInvokeConfig
+    Properties:
+      FunctionName: !Ref CampaignGeneratorFunction
+      Qualifier: $LATEST
+      MaximumEventAgeInSeconds: 3600
+      MaximumRetryAttempts: 0
+
+  CampaignSchedulerInvokeRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${AWS::StackName}-campaign-scheduler-role'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: scheduler.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: InvokeCampaignGenerator
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - lambda:InvokeFunction
+                Resource: !GetAtt CampaignGeneratorFunction.Arn
+
+  CampaignGenerationScheduler:
+    Type: AWS::Scheduler::Schedule
+    Properties:
+      Name: !Sub '${AWS::StackName}-campaign-generator-weekly'
+      Description: Generate weekly agentic campaign draft after chart finalization
+      FlexibleTimeWindow:
+        Mode: 'OFF'
+      ScheduleExpression: !Ref CampaignGenerationSchedule
+      ScheduleExpressionTimezone: America/Los_Angeles
+      State: ENABLED
+      Target:
+        Arn: !GetAtt CampaignGeneratorFunction.Arn
+        RoleArn: !GetAtt CampaignSchedulerInvokeRole.Arn
+
+  InfographicRendererFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub '${AWS::StackName}-infographic-renderer'
+      CodeUri: src/infographic-renderer/
+      Runtime: nodejs20.x
+      Handler: app.lambda_handler
+      Timeout: 60
+      MemorySize: 1536
+      EphemeralStorage:
+        Size: 1024
+      Environment:
+        Variables:
+          CAMPAIGN_ASSETS_BUCKET: !Ref CampaignAssetsBucket
+      Policies:
+        - S3WritePolicy:
+            BucketName: !Ref CampaignAssetsBucket
+        - Statement:
+            - Effect: Allow
+              Action:
+                - s3:GetObject
+              Resource: !Sub '${CampaignAssetsBucket.Arn}/branding/*'
+
+  # AgentCore MCP tool target. This is IAM-authenticated and intended for
+  # AgentCore Gateway, not human browser/API access.
+  AgentCoreToolsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub '${AWS::StackName}-agentcore-tools'
+      CodeUri: src/agentcore-tools/
+      Handler: app.lambda_handler
+      Timeout: 300
+      MemorySize: 512
+      Layers:
+        - !Ref CommonLayer
+        - !Ref AgentSpecLayer
+      Environment:
+        Variables:
+          CAMPAIGN_MODEL_ID: !Ref CampaignModelId
+          CAMPAIGN_MODEL_ENDPOINT: !Ref CampaignModelEndpoint
+          CAMPAIGN_MODEL_PROJECT_ID: !Ref CampaignMantleProject
+          CAMPAIGN_MODEL_API_KEY_SECRET_ARN: !Ref CampaignModelApiKeySecretArn
+          CAMPAIGN_MODEL_READ_TIMEOUT_SECONDS: '120'
+          CAMPAIGN_IMAGE_MODEL_ID: !Ref CampaignImageModelId
+          CAMPAIGN_IMAGE_MODEL_PROJECT_ID: !Ref CampaignMantleProject
+          CAMPAIGN_IMAGE_MODEL_API_KEY_SECRET_ARN: !Ref CampaignImageModelApiKeySecretArn
+          CAMPAIGN_IMAGE_SIZE: !Ref CampaignImageSize
+          CAMPAIGN_IMAGE_MODEL_READ_TIMEOUT_SECONDS: '240'
+          AGENTCORE_MEMORY_ID: !GetAtt AgenticMemory.MemoryId
+          INFOGRAPHIC_RENDERER_FUNCTION_NAME: !Ref InfographicRendererFunction
+          CAMPAIGN_ASSETS_BUCKET: !Ref CampaignAssetsBucket
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref ChartHistoryTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref ChartCampaignsTable
+        - DynamoDBReadPolicy:
+            TableName: !Ref ConfigTable
+        - Statement:
+            - Effect: Allow
+              Action:
+                - lambda:InvokeFunction
+              Resource: !GetAtt InfographicRendererFunction.Arn
+        - Statement:
+            - Effect: Allow
+              Action:
+                - s3:GetObject
+              Resource: !Sub '${CampaignAssetsBucket.Arn}/templates/*'
+        - Statement:
+            - Effect: Allow
+              Action:
+                - s3:PutObject
+              Resource: !Sub '${CampaignAssetsBucket.Arn}/campaigns/*'
+        - Statement:
+            - Effect: Allow
+              Action:
+                - bedrock:GetPrompt
+              Resource: '*'
+        - !If
+          - UseRuntimeCampaignModel
+          - Statement:
+              - Effect: Allow
+                Action:
+                  - bedrock:InvokeModel
+                Resource: !Ref CampaignModelResourceArn
+          - !Ref AWS::NoValue
+        - !If
+          - UseMantleCampaignModel
+          - Statement:
+              - Effect: Allow
+                Action:
+                  - bedrock-mantle:CreateInference
+                  - bedrock-mantle:GetProject
+                Resource: !GetAtt CampaignMantleProject.Arn
+          - !Ref AWS::NoValue
+        - !If
+          - UseCampaignModelApiKey
+          - Statement:
+              - Effect: Allow
+                Action:
+                  - secretsmanager:GetSecretValue
+                Resource: !Ref CampaignModelApiKeySecretArn
+          - !Ref AWS::NoValue
+        - !If
+          - UseCampaignImageModelApiKey
+          - Statement:
+              - Effect: Allow
+                Action:
+                  - secretsmanager:GetSecretValue
+                Resource: !Ref CampaignImageModelApiKeySecretArn
+          - !Ref AWS::NoValue
+        - Statement:
+            - Effect: Allow
+              Action:
+                - bedrock-agentcore:CreateEvent
+                - bedrock-agentcore:RetrieveMemoryRecords
+                - bedrock-agentcore:ListEvents
+                - bedrock-agentcore:GetEvent
+              Resource: !GetAtt AgenticMemory.MemoryArn
+
+  AgentCoreGatewayRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: AllowBedrockAgentCoreAssumeRole
+            Effect: Allow
+            Principal:
+              Service: bedrock-agentcore.amazonaws.com
+            Action: sts:AssumeRole
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Ref AWS::AccountId
+              ArnLike:
+                aws:SourceArn: !Sub 'arn:aws:bedrock-agentcore:${AWS::Region}:${AWS::AccountId}:*'
+      Policies:
+        - PolicyName: InvokeAgentCoreToolLambda
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - lambda:InvokeFunction
+                Resource: !GetAtt AgentCoreToolsFunction.Arn
+
+  AgenticGateway:
+    Type: AWS::BedrockAgentCore::Gateway
+    Properties:
+      Name: !Sub '${AWS::StackName}-agentic'
+      Description: IAM-authenticated MCP gateway for Muddy's chart campaign tools
+      AuthorizerType: AWS_IAM
+      RoleArn: !GetAtt AgentCoreGatewayRole.Arn
+
+  AgenticGatewayTarget:
+    Type: AWS::BedrockAgentCore::GatewayTarget
+    Properties:
+      GatewayIdentifier: !Ref AgenticGateway
+      Name: ChartCampaignTools
+      Description: Lambda-backed MCP tools for chart history and campaign drafts
+      CredentialProviderConfigurations:
+        - CredentialProviderType: GATEWAY_IAM_ROLE
+      TargetConfiguration:
+        Mcp:
+          Lambda:
+            LambdaArn: !GetAtt AgentCoreToolsFunction.Arn
+            ToolSchema:
+              InlinePayload:
+                - Name: get_current_chart
+                  Description: Get the latest persisted weekly Top 10 chart snapshot.
+                  InputSchema:
+                    Type: object
+                    Properties: {}
+                - Name: list_chart_weeks
+                  Description: List available weekly Top 10 chart snapshots.
+                  InputSchema:
+                    Type: object
+                    Properties:
+                      from_date:
+                        Type: string
+                        Description: Optional inclusive start week in YYYY-MM-DD format.
+                      to_date:
+                        Type: string
+                        Description: Optional inclusive end week in YYYY-MM-DD format.
+                      limit:
+                        Type: integer
+                        Description: Maximum weeks to return, capped at 104.
+                - Name: get_chart_week
+                  Description: Get one weekly Top 10 chart snapshot by week id.
+                  InputSchema:
+                    Type: object
+                    Properties:
+                      week_id:
+                        Type: string
+                        Description: Chart week id in YYYY-MM-DD format.
+                    Required:
+                      - week_id
+                - Name: get_chart_range
+                  Description: Get detailed weekly chart snapshots for a date range.
+                  InputSchema:
+                    Type: object
+                    Properties:
+                      from_date:
+                        Type: string
+                        Description: Optional inclusive start week in YYYY-MM-DD format.
+                      to_date:
+                        Type: string
+                        Description: Optional inclusive end week in YYYY-MM-DD format.
+                      limit:
+                        Type: integer
+                        Description: Maximum snapshots to return, capped at 104.
+                - Name: create_chart_brief
+                  Description: Create a deterministic factual chart brief for a week.
+                  InputSchema:
+                    Type: object
+                    Properties:
+                      week_id:
+                        Type: string
+                        Description: Optional chart week id in YYYY-MM-DD format. Defaults to latest.
+                - Name: create_radio_reads
+                  Description: Create broadcast-ready radio read draft content from chart facts.
+                  InputSchema:
+                    Type: object
+                    Properties:
+                      week_id:
+                        Type: string
+                        Description: Optional chart week id in YYYY-MM-DD format. Defaults to latest.
+                - Name: create_infographic_content
+                  Description: Create infographic editorial content from chart facts.
+                  InputSchema:
+                    Type: object
+                    Properties:
+                      week_id:
+                        Type: string
+                        Description: Optional chart week id in YYYY-MM-DD format. Defaults to latest.
+                - Name: create_social_posts
+                  Description: Create social post drafts from chart facts.
+                  InputSchema:
+                    Type: object
+                    Properties:
+                      week_id:
+                        Type: string
+                        Description: Optional chart week id in YYYY-MM-DD format. Defaults to latest.
+                - Name: create_chart_campaign
+                  Description: Create or regenerate a persisted campaign draft for a week.
+                  InputSchema:
+                    Type: object
+                    Properties:
+                      week_id:
+                        Type: string
+                        Description: Optional chart week id in YYYY-MM-DD format. Defaults to latest.
+                      sections:
+                        Type: array
+                        Description: 'Optional sections to generate: radio, infographic, social.'
+                        Items:
+                          Type: string
+                      requested_by:
+                        Type: string
+                        Description: Optional caller/audit label.
+                - Name: list_chart_campaigns
+                  Description: List generated campaign drafts.
+                  InputSchema:
+                    Type: object
+                    Properties:
+                      limit:
+                        Type: integer
+                        Description: Maximum campaigns to return, capped at 100.
+                      next_token:
+                        Type: string
+                        Description: Optional pagination token.
+                - Name: get_chart_campaign
+                  Description: Get one generated campaign draft by week id.
+                  InputSchema:
+                    Type: object
+                    Properties:
+                      week_id:
+                        Type: string
+                        Description: Chart week id in YYYY-MM-DD format.
+                    Required:
+                      - week_id
+                - Name: update_chart_campaign_status
+                  Description: Update a campaign draft status after review.
+                  InputSchema:
+                    Type: object
+                    Properties:
+                      week_id:
+                        Type: string
+                        Description: Chart week id in YYYY-MM-DD format.
+                      status:
+                        Type: string
+                        Description: One of draft, reviewed, approved, published.
+                      actor:
+                        Type: string
+                        Description: Optional actor label for audit metadata.
+                    Required:
+                      - week_id
+                      - status
+
+  # Playlist Generator Lambda
+  PlaylistGeneratorFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub '${AWS::StackName}-playlist-generator'
+      CodeUri: src/playlist-generator/
+      Handler: app.lambda_handler
+      Timeout: 60
+      Layers:
+        - !Ref CommonLayer
+      Environment:
+        Variables:
+          SPOTIFY_CLIENT_ID: !Ref SpotifyClientId
+          SPOTIFY_CLIENT_SECRET: !Ref SpotifyClientSecret
+          SPOTIFY_REFRESH_TOKEN_SECRET: !Ref SpotifyRefreshTokenSecret
+          ENABLE_SPOTIFY: !Ref EnableSpotifyPlaylists
+          ENABLE_SPOTIFY_VALIDATION: !Ref EnableSpotifyValidation
+          ENABLE_SPOTIFY_PLAYLISTS: !Ref EnableSpotifyPlaylists
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref TracksTable
+        - DynamoDBReadPolicy:
+            TableName: !Ref ConfigTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref ChartHistoryTable
+        - Statement:
+            - Effect: Allow
+              Action:
+                - secretsmanager:GetSecretValue
+              Resource: !Ref SpotifyRefreshTokenSecret
+      Events:
+        WeeklySchedule:
+          Type: Schedule
+          Properties:
+            Name: !Sub '${AWS::StackName}-playlist-generator-weekly'
+            Schedule: 'cron(0 10 ? * SAT *)'
+            Description: Generate weekly Top 10 playlist (default Saturday 2am PST - configurable in admin panel)
+            Enabled: !If [SpotifyEnabled, true, false]
+
+  # Schedule Updater Lambda (updates schedule resources when config changes)
+  ScheduleUpdaterFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub '${AWS::StackName}-schedule-updater'
+      CodeUri: src/schedule-updater/
+      Handler: app.lambda_handler
+      Timeout: 30
+      Environment:
+        Variables:
+          PLAYLIST_RULE_NAME: !Sub '${AWS::StackName}-playlist-generator-weekly'
+          CAMPAIGN_SCHEDULE_NAME: !Sub '${AWS::StackName}-campaign-generator-weekly'
+          CAMPAIGN_SCHEDULE_TARGET_ARN: !GetAtt CampaignGeneratorFunction.Arn
+          CAMPAIGN_SCHEDULE_ROLE_ARN: !GetAtt CampaignSchedulerInvokeRole.Arn
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - events:PutRule
+                - events:DescribeRule
+              Resource: !Sub 'arn:aws:events:${AWS::Region}:${AWS::AccountId}:rule/${AWS::StackName}-playlist-generator-weekly'
+            - Effect: Allow
+              Action:
+                - scheduler:GetSchedule
+                - scheduler:UpdateSchedule
+              Resource: !Sub 'arn:aws:scheduler:${AWS::Region}:${AWS::AccountId}:schedule/default/${AWS::StackName}-campaign-generator-weekly'
+            - Effect: Allow
+              Action:
+                - iam:PassRole
+              Resource: !GetAtt CampaignSchedulerInvokeRole.Arn
+      Events:
+        ConfigStream:
+          Type: DynamoDB
+          Properties:
+            Stream: !GetAtt ConfigTable.StreamArn
+            StartingPosition: LATEST
+            BatchSize: 1
+            MaximumBatchingWindowInSeconds: 0
+
+  # API Gateway
+  ApiGateway:
+    Type: AWS::Serverless::Api
+    Properties:
+      Name: !Sub '${AWS::StackName}-api'
+      StageName: Prod
+      Cors:
+        AllowMethods: "'*'"
+        AllowHeaders: "'*'"
+        AllowOrigin: "'*'"
+        MaxAge: "'600'"
+      Auth:
+        Authorizers:
+          CognitoAuthorizer:
+            UserPoolArn: !GetAtt UserPool.Arn
+            Identity:
+              Header: Authorization
+      GatewayResponses:
+        DEFAULT_4XX:
+          ResponseParameters:
+            Headers:
+              Access-Control-Allow-Origin: "'*'"
+              Access-Control-Allow-Headers: "'*'"
+              Access-Control-Allow-Methods: "'*'"
+        DEFAULT_5XX:
+          ResponseParameters:
+            Headers:
+              Access-Control-Allow-Origin: "'*'"
+              Access-Control-Allow-Headers: "'*'"
+              Access-Control-Allow-Methods: "'*'"
+
+  # S3 Bucket for Frontend
+  FrontendBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub '${AWS::StackName}-frontend-${AWS::AccountId}'
+      WebsiteConfiguration:
+        IndexDocument: index.html
+        ErrorDocument: index.html
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      CorsConfiguration:
+        CorsRules:
+          - AllowedOrigins:
+              - '*'
+            AllowedMethods:
+              - GET
+              - HEAD
+            AllowedHeaders:
+              - '*'
+
+  # CloudFront Distribution
+  CloudFrontDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        DefaultRootObject: index.html
+        Aliases: !If
+          - UseCustomCloudFrontDomain
+          - - !Ref CustomDomainName
+          - !Ref AWS::NoValue
+        Origins:
+          - Id: S3Origin
+            DomainName: !GetAtt FrontendBucket.RegionalDomainName
+            S3OriginConfig:
+              OriginAccessIdentity: ''
+            OriginAccessControlId: !GetAtt CloudFrontOriginAccessControl.Id
+        DefaultCacheBehavior:
+          TargetOriginId: S3Origin
+          ViewerProtocolPolicy: redirect-to-https
+          AllowedMethods:
+            - GET
+            - HEAD
+            - OPTIONS
+          CachedMethods:
+            - GET
+            - HEAD
+          ForwardedValues:
+            QueryString: false
+            Cookies:
+              Forward: none
+          Compress: true
+          DefaultTTL: 86400
+          MaxTTL: 31536000
+          MinTTL: 0
+        CustomErrorResponses:
+          - ErrorCode: 404
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+          - ErrorCode: 403
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+        PriceClass: PriceClass_100
+        ViewerCertificate: !If
+          - UseCustomCloudFrontDomain
+          - AcmCertificateArn: !Ref CloudFrontCertificateArn
+            SslSupportMethod: sni-only
+            MinimumProtocolVersion: TLSv1.2_2021
+          - CloudFrontDefaultCertificate: true
+
+  CloudFrontOriginAccessControl:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Name: !Sub '${AWS::StackName}-oac'
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+
+  # Update S3 bucket policy to allow CloudFront OAC
+  FrontendBucketPolicyForCloudFront:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref FrontendBucket
+      PolicyDocument:
+        Statement:
+          - Sid: AllowCloudFrontServicePrincipal
+            Effect: Allow
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Action: 's3:GetObject'
+            Resource: !Sub '${FrontendBucket.Arn}/*'
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub 'arn:aws:cloudfront::${AWS::AccountId}:distribution/${CloudFrontDistribution}'
+
+Outputs:
+  ApiUrl:
+    Description: API Gateway endpoint URL
+    Value: !Sub 'https://${ApiGateway}.execute-api.${AWS::Region}.amazonaws.com/Prod/api'
+
+  FrontendUrl:
+    Description: Frontend URL, using custom domain when configured
+    Value: !If
+      - UseCustomCloudFrontDomain
+      - !Sub 'https://${CustomDomainName}'
+      - !Sub 'https://${CloudFrontDistribution.DomainName}'
+
+  CloudFrontDomainName:
+    Description: CloudFront distribution domain name. Use this as the CNAME target for a custom domain.
+    Value: !GetAtt CloudFrontDistribution.DomainName
+
+  FrontendBucketName:
+    Description: S3 bucket name for frontend
+    Value: !Ref FrontendBucket
+
+  CloudFrontDistributionId:
+    Description: CloudFront distribution ID
+    Value: !Ref CloudFrontDistribution
+
+  TracksTableName:
+    Description: DynamoDB table for tracks
+    Value: !Ref TracksTable
+
+  ConfigTableName:
+    Description: DynamoDB table for configuration
+    Value: !Ref ConfigTable
+
+  ChartHistoryTableName:
+    Description: DynamoDB table for weekly Top 10 chart snapshots
+    Value: !Ref ChartHistoryTable
+
+  ChartCampaignsTableName:
+    Description: DynamoDB table for weekly generated campaign drafts
+    Value: !Ref ChartCampaignsTable
+
+  CampaignAssetsBucketName:
+    Description: S3 bucket for generated campaign image assets
+    Value: !Ref CampaignAssetsBucket
+
+  CampaignMantleProjectId:
+    Description: Bedrock Mantle project ID used for campaign model inference
+    Value: !Ref CampaignMantleProject
+
+  CampaignMantleProjectArn:
+    Description: Bedrock Mantle project ARN used for campaign model inference
+    Value: !GetAtt CampaignMantleProject.Arn
+
+  AgentCoreToolsFunctionName:
+    Description: Lambda function that backs AgentCore Gateway MCP tools
+    Value: !Ref AgentCoreToolsFunction
+
+  AgentCoreGatewayId:
+    Description: AgentCore Gateway identifier
+    Value: !Ref AgenticGateway
+
+  AgentCoreGatewayUrl:
+    Description: AgentCore Gateway MCP endpoint URL
+    Value: !GetAtt AgenticGateway.GatewayUrl
+
+  AgentCoreMemoryId:
+    Description: AgentCore Memory identifier used by campaign generation
+    Value: !GetAtt AgenticMemory.MemoryId
+
+  AgentCoreMemoryArn:
+    Description: AgentCore Memory ARN used by campaign generation
+    Value: !GetAtt AgenticMemory.MemoryArn
+
+  AgentCoreRuntimeArn:
+    Description: AgentCore Runtime ARN for campaign orchestration
+    Value: !GetAtt CampaignAgentRuntime.AgentRuntimeArn
+
+  AgentCoreRuntimeId:
+    Description: AgentCore Runtime identifier for campaign orchestration
+    Value: !GetAtt CampaignAgentRuntime.AgentRuntimeId
+
+  UserPoolId:
+    Description: Cognito User Pool ID
+    Value: !Ref UserPool
+
+  UserPoolClientId:
+    Description: Cognito User Pool Client ID
+    Value: !Ref UserPoolClient
+
+  CognitoHostedUIUrl:
+    Description: Cognito Hosted UI URL
+    Value: !Sub 'https://${UserPoolDomain}.auth.${AWS::Region}.amazoncognito.com'

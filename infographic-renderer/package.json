@@ -1,0 +1,20 @@
+{
+  "name": "muddys-infographic-renderer",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "render": "npm run build --silent && node dist/src/cli.js render",
+    "render:authored": "npm run build --silent && node dist/src/cli.js render-authored",
+    "render:blank": "npm run build --silent && node dist/src/cli.js blank",
+    "test": "npm run build --silent && node dist/tests/schema.test.js && node dist/tests/movement.test.js && node dist/tests/authored-render.test.js"
+  },
+  "dependencies": {
+    "playwright": "^1.46.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.5.0",
+    "typescript": "^5.5.0"
+  }
+}

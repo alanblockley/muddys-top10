@@ -1,0 +1,200 @@
+╔════════════════════════════════════════════════════════════════╗
+║         MUDDY'S MUSIC CAFE - TOP 10 TRACKER                   ║
+║         AWS Serverless Application (Updated)                  ║
+╚════════════════════════════════════════════════════════════════╝
+
+NOTE: This is a historical implementation summary. Use docs/README.md as the
+canonical documentation index for current deployment, security, and operations.
+
+PROJECT FILES CREATED:
+════════════════════════════════════════════════════════════════
+
+Infrastructure:
+  ✓ template.yaml             - SAM template with all AWS resources
+  ✓ samconfig.toml            - SAM deployment configuration
+  ✓ deploy.sh                 - Automated deployment script
+  ✓ test_deployment.sh        - Pre-flight validation
+
+Lambda Functions:
+  ✓ src/poller/app.py         - Stream poller (every minute)
+  ✓ src/api/app.py            - API handler (no frontend)
+
+Shared Code:
+  ✓ layers/common/python/common.py - Utility functions
+
+Frontend:
+  ✓ frontend/index.html       - Static HTML (S3 + CloudFront)
+
+Documentation:
+  ✓ README.md                 - Complete documentation
+  ✓ QUICKSTART.md             - 5-minute setup guide
+  ✓ DEPLOYMENT.md             - Detailed deployment guide
+  ✓ ARCHITECTURE.md           - System architecture docs
+
+Testing:
+  ✓ test_stream.py            - Stream connectivity test
+  ✓ track_logger.py           - Local testing tool
+
+Other:
+  ✓ .gitignore                - Git ignore rules
+  ✓ requirements.txt          - Python dependencies
+
+DEPLOYMENT ARCHITECTURE:
+════════════════════════════════════════════════════════════════
+
+┌─────────────────────────────────────────────────────────────┐
+│  deploy.sh Automated Deployment Script                     │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  1. 📦 sam build                                            │
+│     └─ Package Lambda functions                            │
+│                                                             │
+│  2. 🚀 sam deploy --stack-name muddys-now-playing          │
+│     └─ Deploy CloudFormation stack                         │
+│                                                             │
+│  3. 📊 Read Stack Outputs                                   │
+│     ├─ API Gateway URL                                     │
+│     ├─ S3 Bucket Name                                      │
+│     └─ CloudFront Distribution ID                          │
+│                                                             │
+│  4. ⚙️  Configure Frontend                                  │
+│     └─ sed 's/%%API_ENDPOINT%%/$API_URL/' index.html      │
+│                                                             │
+│  5. 📤 Upload to S3                                         │
+│     └─ aws s3 cp index.html s3://bucket/                   │
+│                                                             │
+│  6. 🔄 Invalidate CloudFront Cache                          │
+│     └─ aws cloudfront create-invalidation                  │
+│                                                             │
+│  7. 🧪 Test Deployment                                      │
+│     ├─ Health check API                                    │
+│     └─ Verify S3 access                                    │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+
+STACK CONFIGURATION:
+════════════════════════════════════════════════════════════════
+
+Stack Name:           muddys-now-playing
+Default Region:       us-east-1
+Stream URL Parameter: Configurable via SAM parameter
+
+FEATURES IMPLEMENTED:
+════════════════════════════════════════════════════════════════
+
+✅ Automatic stream polling (every minute)
+✅ DynamoDB storage for track history, config, and weekly Top 10 snapshots
+✅ History view with 2-hour block grouping
+✅ Top 10 chart with weekly rankings
+✅ Week-over-week movement indicators (↑↓★−)
+✅ Configurable chart generation time
+✅ Configurable stream URL (SAM parameter)
+✅ Responsive web UI (S3 + CloudFront)
+✅ API Gateway REST endpoints
+✅ Automated deployment script
+✅ Frontend API endpoint injection
+✅ CloudFront CDN for global delivery
+✅ Automated cache invalidation
+✅ Serverless architecture
+✅ Pay-per-use pricing (~$3-5/month)
+
+AWS RESOURCES CREATED:
+════════════════════════════════════════════════════════════════
+
+• 2 Lambda Functions (Poller + API)
+• 1 Lambda Layer (Common utilities)
+• 2 DynamoDB Tables (Tracks + Config)
+• 1 API Gateway (REST API)
+• 1 S3 Bucket (Frontend hosting)
+• 1 CloudFront Distribution (CDN)
+• 1 EventBridge Rule (Polling schedule)
+• IAM Roles & Policies
+• CloudFront OAC (Origin Access Control)
+
+DEPLOYMENT OUTPUTS:
+════════════════════════════════════════════════════════════════
+
+After deployment, you get:
+
+• FrontendUrl          - CloudFront URL (main access point)
+• ApiUrl               - API Gateway endpoint
+• FrontendBucketName   - S3 bucket name
+• CloudFrontDomainName - CNAME target for custom frontend domains
+• CloudFrontDistributionId - For cache management
+• TracksTableName      - DynamoDB tracks table
+• ConfigTableName      - DynamoDB config table
+• ChartHistoryTableName - DynamoDB weekly Top 10 snapshot table
+
+API ENDPOINTS:
+════════════════════════════════════════════════════════════════
+
+GET  /api/health        - Health check
+GET  /api/history       - Track history (7 days, 2-hour blocks)
+GET  /api/top10         - Top 10 chart with movement
+GET  /api/top10/history - Weekly Top 10 snapshot index
+GET  /api/top10/history/{week_id} - Weekly Top 10 snapshot detail
+GET  /api/config        - Get configuration
+PUT  /api/config        - Update configuration
+
+DEPLOYMENT COMMANDS:
+════════════════════════════════════════════════════════════════
+
+Quick Deploy (Recommended):
+  ./deploy.sh
+
+Pre-flight Check:
+  ./test_deployment.sh
+
+Manual Deploy:
+  sam build --use-container
+  sam deploy --config-env prod --stack-name muddys-now-playing
+
+View Logs:
+  sam logs -n StreamPollerFunction --stack-name muddys-now-playing --tail
+  sam logs -n ApiFunction --stack-name muddys-now-playing --tail
+
+Delete Stack:
+  sam delete --stack-name muddys-now-playing
+
+FRONTEND CONFIGURATION:
+════════════════════════════════════════════════════════════════
+
+The frontend HTML contains a placeholder:
+  const API_BASE = '%%API_ENDPOINT%%';
+
+During deployment, deploy.sh:
+1. Reads frontend/index.html
+2. Replaces %%API_ENDPOINT%% with actual API Gateway URL
+3. Uploads configured HTML to S3
+4. Invalidates CloudFront cache
+
+This ensures the frontend always points to the correct API!
+
+ADVANTAGES OF THIS ARCHITECTURE:
+════════════════════════════════════════════════════════════════
+
+✓ Fully automated deployment
+✓ No manual configuration needed
+✓ Frontend hosted on S3 (cheap, reliable)
+✓ CloudFront CDN (fast global access)
+✓ Separate concerns (frontend vs backend)
+✓ Easy to update frontend independently
+✓ Automated cache invalidation
+✓ Stack outputs drive configuration
+
+NEXT STEPS:
+════════════════════════════════════════════════════════════════
+
+1. Review the QUICKSTART.md for deployment instructions
+2. Run: ./test_deployment.sh
+3. Run: ./deploy.sh
+4. Wait 5-10 minutes for data to accumulate
+5. Open the CloudFront URL in your browser
+6. Enjoy your Top 10 tracker!
+
+═══════════════════════════════════════════════════════════════
+Stream tested: ✅ Working
+Deploy script:  ✅ Automated (build → deploy → configure → upload)
+Stack name:    muddys-now-playing
+Ready to deploy: ✅ All files in place
+═══════════════════════════════════════════════════════════════

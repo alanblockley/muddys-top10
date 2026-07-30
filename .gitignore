@@ -1,0 +1,55 @@
+# SAM build artifacts
+.aws-sam/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+
+# Virtual environments
+.env
+.venv
+venv/
+
+# Node.js
+node_modules/
+
+# Rust build artifacts
+target/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+*:Zone.Identifier
+
+# Deployment config (contains secrets)
+samconfig.toml
+
+# Generated/configured frontend files
+frontend/index-configured.html
+
+# Infographic renderer output
+infographic-renderer/output/
+
+# Large data exports (not source code)
+tools/dynamodb-export-*.json
+
+# Local data files
+tracks.csv
+*.csv
+
+# Sample chart data files (large JSON exports)
+2026-*.json
+
+# Sample/reference images (large PNGs, not source code)
+samples/

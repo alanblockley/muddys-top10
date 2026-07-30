@@ -1,0 +1,1 @@
+# No additional requirements beyond boto3 (included in Lambda runtime)

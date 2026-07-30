@@ -1,0 +1,83 @@
+{
+  "layout": {
+    "variant": "feature-climber",
+    "featured_story": "biggest_climber"
+  },
+  "week": {
+    "start": "2026-07-18",
+    "end": "2026-07-25",
+    "display": "JUL 18 - JUL 25, 2026"
+  },
+  "chart": [
+    { "position": 1, "artist": "Ella Langley", "title": "Choosin' Texas", "plays": 16, "movement": { "type": "up", "places": 1 } },
+    { "position": 2, "artist": "Sombr", "title": "12 To 12", "plays": 15, "movement": { "type": "down", "places": 1 } },
+    { "position": 3, "artist": "Bon Jovi", "title": "Red White And Jersey", "plays": 14, "movement": { "type": "same", "places": 0 } },
+    { "position": 4, "artist": "Fleetwood Mac", "title": "Little Lies", "plays": 13, "movement": { "type": "up", "places": 5 } },
+    { "position": 5, "artist": "Dua Lipa", "title": "Don't Start Now", "plays": 12, "movement": { "type": "new" } },
+    { "position": 6, "artist": "Journey", "title": "Stone In Love", "plays": 11, "movement": { "type": "down", "places": 2 } },
+    { "position": 7, "artist": "Miley Cyrus", "title": "Can't Be Tamed", "plays": 10, "movement": { "type": "reentry" } },
+    { "position": 8, "artist": "Robbie Williams", "title": "Let Me Entertain You", "plays": 9, "movement": { "type": "up", "places": 1 } },
+    { "position": 9, "artist": "Def Leppard", "title": "Pour Some Sugar On Me", "plays": 8, "movement": { "type": "down", "places": 3 } },
+    { "position": 10, "artist": "Walk The Moon", "title": "Shut Up And Dance", "plays": 7, "movement": { "type": "new" } }
+  ],
+  "chartBadges": [
+    {
+      "position": 5,
+      "label": "NEW ENTRY!",
+      "tone": "new"
+    },
+    {
+      "position": 7,
+      "label": "RE-ENTRY!",
+      "tone": "feature"
+    }
+  ],
+  "chartTalk": [
+    { "slot": 1, "kind": "new-number-one", "icon": "trophy", "emphasis": "normal", "heading": "NEW NUMBER ONE", "body": "Ella Langley takes the crown after a tight race at the top." },
+    { "slot": 2, "kind": "biggest-move", "icon": "rocket", "emphasis": "normal", "heading": "BIGGEST MOVE", "body": "Fleetwood Mac makes the week's sharpest climb into the Top 5." },
+    { "slot": 3, "kind": "new-entry", "icon": "star", "emphasis": "normal", "heading": "NEW ENERGY", "body": "Two new entries keep the countdown feeling fresh this week." },
+    { "slot": 4, "kind": "request-power", "icon": "note", "emphasis": "normal", "heading": "REQUEST POWER", "body": "Listener requests continue to shape the Muddy's chart story." },
+    { "slot": 5, "kind": "returning-hit", "icon": "music", "emphasis": "normal", "heading": "RETURNING HIT", "body": "Miley Cyrus returns to the chart and lands straight in the Top 10." },
+    {
+      "slot": 6,
+      "kind": "biggest-climber",
+      "icon": "climber",
+      "emphasis": "feature",
+      "heading": "BIGGEST CLIMBER",
+      "body": "Fleetwood Mac makes the week's sharpest climb, jumping five places into the Top 5.",
+      "short_body": "Fleetwood Mac jumps five places.",
+      "metrics": {
+        "artist": "Fleetwood Mac",
+        "track": "Little Lies",
+        "movement": 5
+      }
+    }
+  ],
+  "stats": {
+    "newEntries": 2,
+    "climbers": 3,
+    "fallers": 3,
+    "nonMovers": 1
+  },
+  "facts": [
+    "Just 1 play separates #1 and #2.",
+    "Three tracks climbed this week.",
+    "Ten different artists appear in the Top 10."
+  ],
+  "numbers": {
+    "totalPlaysThisWeek": 115,
+    "totalPlaysLastWeek": 121,
+    "percentageChange": -5.0,
+    "weeksSinceLaunch": 12,
+    "differentArtists": 10
+  },
+  "show": {
+    "time": "2AM SLT",
+    "day": "EVERY SATURDAY",
+    "presenters": "DJ TOOHEY & JP",
+    "presenterTagline": "The Australian Dynamic Duo!",
+    "venueName": "MUDDY'S MUSIC CAFE",
+    "venueTagline": "WHERE MUSIC & FRIENDS COME TOGETHER",
+    "compiledFrom": "COMPILED FROM SONGS PLAYED BY OUR DJS AND PATRON REQUESTS"
+  }
+}
