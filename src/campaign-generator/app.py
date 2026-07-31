@@ -177,7 +177,8 @@ def agentcore_runtime_session_id(payload, source):
     stack_hint = os.environ.get('AWS_LAMBDA_FUNCTION_NAME', 'muddys-top10')
     safe_stack_hint = re.sub(r'[^A-Za-z0-9_-]', '-', stack_hint)[-24:]
     safe_week_id = re.sub(r'[^A-Za-z0-9_-]', '-', week_id)
-    return f"muddys-campaign-{source}-{safe_stack_hint}-{safe_week_id}"
+    timestamp = re.sub(r'[^0-9]', '', str(datetime.now(timezone.utc).isoformat())[:19])
+    return f"muddys-campaign-{source}-{safe_stack_hint}-{safe_week_id}-{timestamp}"
 
 
 def read_agentcore_response(response):
