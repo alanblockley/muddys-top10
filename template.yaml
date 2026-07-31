@@ -719,6 +719,22 @@ Resources:
             RestApiId: !Ref ApiGateway
             Auth:
               Authorizer: CognitoAuthorizer
+        GetInfographicTemplates:
+          Type: Api
+          Properties:
+            Path: /api/config/infographic-templates
+            Method: GET
+            RestApiId: !Ref ApiGateway
+            Auth:
+              Authorizer: CognitoAuthorizer
+        PostInfographicTemplate:
+          Type: Api
+          Properties:
+            Path: /api/config/infographic-templates
+            Method: POST
+            RestApiId: !Ref ApiGateway
+            Auth:
+              Authorizer: CognitoAuthorizer
         GetHealth:
           Type: Api
           Properties:

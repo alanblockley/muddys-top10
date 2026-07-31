@@ -840,6 +840,119 @@ def template_reference_infographic_content(chart_brief, venue_config):
     }
 
 
+def list_infographic_templates(event):
+    """List uploaded infographic templates (HTML and PNG files)."""
+    try:
+        templates = get_config_value('infographic_template_uploads') or []
+        bucket = os.environ.get('CAMPAIGN_ASSETS_BUCKET')
+        for tpl in templates:
+            if tpl.get('s3_key') and bucket:
+                try:
+                    tpl['url'] = s3_client.generate_presigned_url(
+                        'get_object',
+                        Params={'Bucket': bucket, 'Key': tpl['s3_key']},
+                        ExpiresIn=3600
+                    )
+                except Exception:
+                    tpl['url'] = None
+        return api_response(200, {'templates': templates})
+    except Exception as e:
+        print(f"Error listing infographic templates: {e}")
+        return api_response(500, {'error': str(e)})
+
+
+def upload_infographic_template(event):
+    """Upload a named infographic template (HTML or PNG)."""
+    try:
+        body = parse_json_body(event)
+        name = str(body.get('name') or '').strip()
+        if not name or len(name) > 100:
+            return api_response(400, {'error': 'Template name is required (max 100 characters)'})
+
+        filename = str(body.get('filename') or '').strip()
+        content_type = str(body.get('content_type') or '').lower().strip()
+        data = str(body.get('data') or '')
+
+        # Handle data URI prefix
+        if ',' in data and data.startswith('data:'):
+            header, data = data.split(',', 1)
+            if not content_type and ';' in header:
+                content_type = header[5:].split(';', 1)[0].lower()
+
+        allowed_types = {
+            'image/png': 'png',
+            'text/html': 'html',
+            'application/html': 'html',
+        }
+        if content_type not in allowed_types:
+            return api_response(400, {'error': 'Template must be PNG or HTML file'})
+
+        try:
+            raw = base64.b64decode(data, validate=True)
+        except (binascii.Error, ValueError):
+            return api_response(400, {'error': 'File data must be valid base64'})
+
+        max_bytes = 5 * 1024 * 1024
+        if not raw or len(raw) > max_bytes:
+            return api_response(400, {'error': 'Template file must be between 1 byte and 5 MB'})
+
+        bucket = os.environ.get('CAMPAIGN_ASSETS_BUCKET')
+        if not bucket:
+            raise RuntimeError('CAMPAIGN_ASSETS_BUCKET is not configured')
+
+        ext = allowed_types[content_type]
+        safe_name = re.sub(r'[^A-Za-z0-9_.-]', '-', name).strip('-') or 'template'
+        timestamp = utc_now_iso().replace(':', '-')
+        key = f'templates/uploads/{safe_name}-{timestamp}.{ext}'
+
+        s3_client.put_object(
+            Bucket=bucket,
+            Key=key,
+            Body=raw,
+            ContentType=content_type,
+            CacheControl='private, max-age=31536000',
+            Metadata={
+                'uploaded_by': request_actor(event) or '',
+                'template_name': name,
+                'source_filename': filename
+            }
+        )
+
+        # Store template metadata in config
+        templates = get_config_value('infographic_template_uploads') or []
+        new_template = {
+            'name': name,
+            'filename': filename,
+            's3_key': key,
+            'content_type': content_type,
+            'size_bytes': len(raw),
+            'uploaded_at': utc_now_iso(),
+            'uploaded_by': request_actor(event)
+        }
+        templates.append(new_template)
+        config_table.put_item(Item={
+            'configKey': 'infographic_template_uploads',
+            'value': templates
+        })
+
+        # Generate presigned URL for immediate display
+        try:
+            new_template['url'] = s3_client.generate_presigned_url(
+                'get_object',
+                Params={'Bucket': bucket, 'Key': key},
+                ExpiresIn=3600
+            )
+        except Exception:
+            new_template['url'] = None
+
+        return api_response(201, {'template': new_template, 'templates': templates})
+    except ValueError as e:
+        return api_response(400, {'error': str(e)})
+    except Exception as e:
+        print(f"Error uploading infographic template: {e}")
+        return api_response(500, {'error': str(e)})
+
+
 def normalize_chart_config(config):
     config = config if isinstance(config, dict) else {}
     valid_days = {
@@ -2030,6 +2143,10 @@ def lambda_handler(event, context):
             return put_campaign_logo(event)
         elif path == '/api/config/infographic-template/reference' and method == 'POST':
             return post_infographic_template_reference(event)
+        elif path == '/api/config/infographic-templates' and method == 'GET':
+            return list_infographic_templates(event)
+        elif path == '/api/config/infographic-templates' and method == 'POST':
+            return upload_infographic_template(event)
         elif path == '/api/health' and method == 'GET':
             return health_check(event)
         elif path == '/api/spotify/connect' and method == 'GET':

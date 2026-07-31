@@ -2096,6 +2096,14 @@
                         </div>
                     </div>
 
+                    <div class="form-group">
+                        <label>Uploaded Templates:</label>
+                        <div id="templateUploadsList" style="margin-bottom: 12px;">
+                            <span style="color: #64748b;">Loading...</span>
+                        </div>
+                        <button onclick="openTemplateUploadModal()" class="btn btn-secondary" type="button">Upload Template</button>
+                    </div>
+
                     <button onclick="saveCampaignBranding()" class="btn">Save Campaign Branding</button>
                 </div>
 
@@ -2201,10 +2209,29 @@
                             </div>
                         </div>
                     </div>
+
+                    <!-- Template Upload Modal -->
+                    <div id="templateUploadModal" class="campaign-modal" onclick="if(event.target===this)closeTemplateUploadModal()">
+                        <div class="campaign-modal-panel" role="dialog" aria-modal="true" style="max-width: 540px;">
+                            <button class="campaign-modal-close" onclick="closeTemplateUploadModal()">Close</button>
+                            <h3 style="color: #e4e8f0; margin-bottom: 16px;">Upload Infographic Template</h3>
+                            <p class="help-text" style="margin-bottom: 16px;">Upload an HTML layout or PNG reference image. Each upload is named for easy identification.</p>
+                            <div class="form-group">
+                                <label for="templateUploadName">Template Name:</label>
+                                <input type="text" id="templateUploadName" placeholder="e.g., Dark neon poster v2" maxlength="100">
+                            </div>
+                            <div class="form-group">
+                                <label for="templateUploadFile">File (HTML or PNG):</label>
+                                <input type="file" id="templateUploadFile" accept=".html,.htm,.png" style="color: #94a3b8;">
+                                <p class="help-text" style="margin-top: 4px;">Max 5 MB. Accepted formats: .html, .png</p>
+                            </div>
+                            <div id="templateUploadPreview" style="margin-bottom: 12px;"></div>
+                            <div id="templateUploadError" style="color: #ef4444; margin-bottom: 12px; display: none;"></div>
+                            <button id="templateUploadSubmitBtn" onclick="submitTemplateUpload()" class="btn" type="button">Upload</button>
+                        </div>
+                    </div>
                 </div>
             </div>
-
-            <div id="tab-spotify" class="tab-content">
                 <div class="card">
                     <h2 style="margin-bottom: 20px;">🎵 Spotify Integration</h2>
                     <p class="help-text" style="margin-bottom: 20px;">
@@ -4395,6 +4422,7 @@
                 const infographicTemplate = data.campaign_infographic_template || {};
                 setSelectValue('infographicTemplateId', infographicTemplate.template_id || 'classic_chart_poster');
                 updateTemplateReferenceStatus(infographicTemplate);
+                loadTemplateUploadsList();
                 populateCampaignPromptSettings(data.campaign_prompts || {});
 
                 hideLoading();
@@ -4656,6 +4684,118 @@
             const date = new Date(value);
             if (Number.isNaN(date.getTime())) return value;
             return date.toLocaleString();
+        }
+
+        // --- Template Upload Modal ---
+        function openTemplateUploadModal() {
+            document.getElementById('templateUploadName').value = '';
+            document.getElementById('templateUploadFile').value = '';
+            document.getElementById('templateUploadPreview').innerHTML = '';
+            document.getElementById('templateUploadError').style.display = 'none';
+            document.getElementById('templateUploadModal').classList.add('open');
+            loadTemplateUploadsList();
+        }
+
+        function closeTemplateUploadModal() {
+            document.getElementById('templateUploadModal').classList.remove('open');
+        }
+
+        async function loadTemplateUploadsList() {
+            const container = document.getElementById('templateUploadsList');
+            try {
+                const response = await fetch(`${CONFIG.apiEndpoint}/config/infographic-templates`, {
+                    headers: { Authorization: localStorage.getItem('id_token') }
+                });
+                if (!response.ok) throw new Error('Failed to load templates');
+                const data = await response.json();
+                const templates = data.templates || [];
+                if (templates.length === 0) {
+                    container.innerHTML = '<span style="color: #64748b;">No templates uploaded yet.</span>';
+                    return;
+                }
+                container.innerHTML = templates.map(tpl => `
+                    <div style="display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid #1e293b;">
+                        <span style="color: #e4e8f0; font-weight: 500;">${escapeHtml(tpl.name)}</span>
+                        <span style="color: #64748b; font-size: 0.85em;">${escapeHtml(tpl.content_type === 'image/png' ? 'PNG' : 'HTML')}</span>
+                        <span style="color: #64748b; font-size: 0.8em; margin-left: auto;">${tpl.uploaded_at ? formatReadableDateTime(tpl.uploaded_at) : ''}</span>
+                        ${tpl.url && tpl.content_type === 'image/png' ? `<a href="${escapeHtml(tpl.url)}" target="_blank" style="color: #818cf8; font-size: 0.85em;">View</a>` : ''}
+                    </div>
+                `).join('');
+            } catch (e) {
+                container.innerHTML = '<span style="color: #ef4444;">Failed to load templates.</span>';
+            }
+        }
+
+        async function submitTemplateUpload() {
+            const name = document.getElementById('templateUploadName').value.trim();
+            const fileInput = document.getElementById('templateUploadFile');
+            const errorDiv = document.getElementById('templateUploadError');
+            const submitBtn = document.getElementById('templateUploadSubmitBtn');
+            errorDiv.style.display = 'none';
+
+            if (!name) {
+                errorDiv.textContent = 'Please enter a template name.';
+                errorDiv.style.display = 'block';
+                return;
+            }
+            if (!fileInput.files || !fileInput.files[0]) {
+                errorDiv.textContent = 'Please select a file.';
+                errorDiv.style.display = 'block';
+                return;
+            }
+
+            const file = fileInput.files[0];
+            const maxSize = 5 * 1024 * 1024;
+            if (file.size > maxSize) {
+                errorDiv.textContent = 'File is too large (max 5 MB).';
+                errorDiv.style.display = 'block';
+                return;
+            }
+
+            let content_type = '';
+            if (file.name.toLowerCase().endsWith('.png')) content_type = 'image/png';
+            else if (file.name.toLowerCase().endsWith('.html') || file.name.toLowerCase().endsWith('.htm')) content_type = 'text/html';
+            else {
+                errorDiv.textContent = 'File must be .html or .png';
+                errorDiv.style.display = 'block';
+                return;
+            }
+
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Uploading...';
+
+            try {
+                const arrayBuffer = await file.arrayBuffer();
+                const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+
+                const response = await fetch(`${CONFIG.apiEndpoint}/config/infographic-templates`, {
+                    method: 'POST',
+                    headers: {
+                        Authorization: localStorage.getItem('id_token'),
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        name: name,
+                        filename: file.name,
+                        content_type: content_type,
+                        data: base64
+                    })
+                });
+
+                if (!response.ok) {
+                    const err = await response.json().catch(() => ({}));
+                    throw new Error(err.error || `Upload failed (${response.status})`);
+                }
+
+                closeTemplateUploadModal();
+                loadTemplateUploadsList();
+            } catch (e) {
+                errorDiv.textContent = e.message || 'Upload failed.';
+                errorDiv.style.display = 'block';
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Upload';
+            }
         }
 
         async function resizeLogoForUpload(file) {
