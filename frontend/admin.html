@@ -4405,7 +4405,18 @@
                 } else {
                     setSelectValue('infographicTemplateId', infographicTemplate.template_id || 'classic_chart_poster');
                 }
-                updateTemplateReferenceStatus(infographicTemplate);
+                // Show the preview for the currently selected template
+                if (infographicTemplate.source === 'uploaded' && infographicTemplate.reference_png_url) {
+                    const frame = document.getElementById('templateReferenceFrame');
+                    const status = document.getElementById('templateReferenceStatus');
+                    if (frame) {
+                        frame.classList.add('has-preview');
+                        frame.innerHTML = `<img src="${escapeHtml(infographicTemplate.reference_png_url)}" alt="Current infographic template preview">`;
+                    }
+                    if (status) status.textContent = `${infographicTemplate.name || 'Uploaded template'} — active template for campaign generation.`;
+                } else {
+                    updateTemplateReferenceStatus(infographicTemplate);
+                }
                 populateCampaignPromptSettings(data.campaign_prompts || {});
 
                 hideLoading();
