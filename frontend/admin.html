@@ -2081,17 +2081,16 @@
 
                     <div class="form-group">
                         <label for="infographicTemplateId">Infographic Layout Template:</label>
-                        <select id="infographicTemplateId">
+                        <select id="infographicTemplateId" onchange="onTemplateSelected()">
                             <option value="classic_chart_poster">Classic Chart Poster</option>
                         </select>
-                        <p class="help-text">The template is stored as a versioned layout input. Generated campaign PNGs remain immutable snapshots.</p>
+                        <p class="help-text">Select a template to preview. Uploaded templates show immediately; built-in templates generate a reference preview.</p>
                         <div class="template-reference-row">
                             <div id="templateReferenceFrame" class="template-reference-frame">
-                                <span>No template preview generated yet</span>
+                                <span>Select a template to see preview</span>
                             </div>
                             <div class="template-reference-controls">
-                                <button id="templateReferenceGenerateBtn" onclick="generateInfographicTemplateReference()" class="btn btn-secondary" type="button">Generate Template Preview</button>
-                                <p class="help-text" id="templateReferenceStatus">This PNG is used as a visual reference for future campaign infographic generation.</p>
+                                <p class="help-text" id="templateReferenceStatus">The preview shows how campaign infographics will look with this template.</p>
                             </div>
                         </div>
                     </div>
@@ -4541,29 +4540,66 @@
             }
         }
 
-        async function generateInfographicTemplateReference() {
-            showLoading();
-            try {
-                const response = await fetch(`${CONFIG.apiEndpoint}/config/infographic-template/reference`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': accessToken
-                    },
-                    body: JSON.stringify({})
-                });
-                const data = await response.json();
-                if (!response.ok) {
-                    throw new Error(data.error || 'Failed to generate template preview');
-                }
+        async function onTemplateSelected() {
+            const select = document.getElementById('infographicTemplateId');
+            const value = select?.value || '';
+            const frame = document.getElementById('templateReferenceFrame');
+            const status = document.getElementById('templateReferenceStatus');
 
-                updateTemplateReferenceStatus(data.campaign_infographic_template || {});
-                hideLoading();
-                showSuccess('Template preview generated successfully. Future campaigns can use it as a visual reference.');
-            } catch (error) {
-                hideLoading();
-                showError('Failed to generate template preview: ' + error.message);
+            if (value.startsWith('uploaded_')) {
+                // Uploaded template - find it and show preview directly
+                const s3Key = value.replace('uploaded_', '');
+                try {
+                    const response = await fetch(`${CONFIG.apiEndpoint}/config/infographic-templates`, {
+                        headers: { 'Authorization': accessToken }
+                    });
+                    if (response.ok) {
+                        const data = await response.json();
+                        const tpl = (data.templates || []).find(t => t.s3_key === s3Key);
+                        if (tpl && tpl.url && tpl.content_type === 'image/png') {
+                            frame.classList.add('has-preview');
+                            frame.innerHTML = `<img src="${escapeHtml(tpl.url)}" alt="${escapeHtml(tpl.name)} template preview">`;
+                            status.textContent = `${tpl.name} — uploaded ${formatReadableDateTime(tpl.uploaded_at)}`;
+                        } else if (tpl && tpl.content_type === 'text/html') {
+                            frame.classList.remove('has-preview');
+                            frame.innerHTML = `<span style="color: #94a3b8;">HTML template: ${escapeHtml(tpl.name)}<br>HTML templates are rendered at generation time.</span>`;
+                            status.textContent = `${tpl.name} (HTML) — uploaded ${formatReadableDateTime(tpl.uploaded_at)}`;
+                        } else {
+                            frame.classList.remove('has-preview');
+                            frame.innerHTML = '<span>Preview not available</span>';
+                        }
+                    }
+                } catch (e) {
+                    frame.classList.remove('has-preview');
+                    frame.innerHTML = '<span style="color: #ef4444;">Failed to load preview</span>';
+                }
+            } else {
+                // Built-in template - generate reference preview
+                frame.classList.remove('has-preview');
+                frame.innerHTML = '<span style="color: #94a3b8;">Generating preview...</span>';
+                status.textContent = 'Generating reference preview for built-in template...';
+                try {
+                    const response = await fetch(`${CONFIG.apiEndpoint}/config/infographic-template/reference`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': accessToken
+                        },
+                        body: JSON.stringify({})
+                    });
+                    const data = await response.json();
+                    if (!response.ok) throw new Error(data.error || 'Failed to generate preview');
+                    updateTemplateReferenceStatus(data.campaign_infographic_template || {});
+                } catch (e) {
+                    frame.innerHTML = `<span style="color: #ef4444;">Preview failed: ${escapeHtml(e.message)}</span>`;
+                    status.textContent = 'Failed to generate preview.';
+                }
             }
+        }
+
+        async function generateInfographicTemplateReference() {
+            // Keep for backward compat but delegate to onTemplateSelected
+            await onTemplateSelected();
         }
 
         async function uploadCampaignLogo() {
