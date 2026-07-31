@@ -713,6 +713,39 @@ def generate_infographic_asset_with_model(
     }
 
 
+def build_infographic_asset_prompt_package(chart_brief, infographic, venue_config, infographic_template, agent_spec, personal_context, memory_context, schema, prompt_config=None):
+    variables = prompt_variables(
+        'infographic_asset',
+        chart_brief,
+        venue_config,
+        agent_spec,
+        personal_context,
+        memory_context,
+        schema,
+        infographic=infographic,
+        infographic_template=infographic_template
+    )
+    try:
+        managed = render_managed_prompt('infographic_asset', prompt_config, variables)
+        if managed:
+            managed['text'] += infographic_asset_prompt_guard()
+            return managed
+    except Exception as e:
+        print(f"Managed prompt unavailable for infographic_asset; using code prompt: {e}")
+        return {
+            'text': build_infographic_asset_prompt(chart_brief, infographic, venue_config, infographic_template, agent_spec, personal_context, memory_context, schema),
+            'ref': {
+                **code_prompt_ref('infographic_asset'),
+                'fallback_reason': str(e)
+            }
+        }
+
+    return {
+        'text': build_infographic_asset_prompt(chart_brief, infographic, venue_config, infographic_template, agent_spec, personal_context, memory_context, schema),
+        'ref': code_prompt_ref('infographic_asset')
+    }
+
+
 def build_infographic_asset_prompt(chart_brief, infographic, venue_config, infographic_template, agent_spec, personal_context, memory_context, schema):
     context_text = '\n\n'.join(item['content'] for item in personal_context)
     memory_text = campaign_json_dumps(memory_context, indent=2) if memory_context else '(none available)'
