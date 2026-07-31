@@ -4704,7 +4704,7 @@
             const container = document.getElementById('templateUploadsList');
             try {
                 const response = await fetch(`${CONFIG.apiEndpoint}/config/infographic-templates`, {
-                    headers: { Authorization: localStorage.getItem('id_token') }
+                    headers: { 'Authorization': accessToken }
                 });
                 if (!response.ok) throw new Error('Failed to load templates');
                 const data = await response.json();
@@ -4771,7 +4771,7 @@
                 const response = await fetch(`${CONFIG.apiEndpoint}/config/infographic-templates`, {
                     method: 'POST',
                     headers: {
-                        Authorization: localStorage.getItem('id_token'),
+                        'Authorization': accessToken,
                         'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({
