@@ -2082,7 +2082,6 @@
                     <div class="form-group">
                         <label for="infographicTemplateId">Infographic Layout Template:</label>
                         <select id="infographicTemplateId" onchange="onTemplateSelected()">
-                            <option value="classic_chart_poster">Classic Chart Poster</option>
                         </select>
                         <p class="help-text">Select a template to preview. Uploaded templates show immediately; built-in templates generate a reference preview.</p>
                         <div class="template-reference-row">
@@ -4403,7 +4402,7 @@
                 if (infographicTemplate.source === 'uploaded' && infographicTemplate.s3_key) {
                     setSelectValue('infographicTemplateId', 'uploaded_' + infographicTemplate.s3_key);
                 } else {
-                    setSelectValue('infographicTemplateId', infographicTemplate.template_id || 'classic_chart_poster');
+                    setSelectValue('infographicTemplateId', infographicTemplate.template_id || '');
                 }
                 // Show the preview for the currently selected template
                 if (infographicTemplate.source === 'uploaded' && infographicTemplate.reference_png_url) {

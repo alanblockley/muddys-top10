@@ -161,7 +161,7 @@ def render_template(template, variables):
 
 
 def template_public_options():
-    return list(TEMPLATE_OPTIONS.values())
+    return []
 
 
 def replace_tokens(value, variables):
