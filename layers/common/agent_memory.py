@@ -90,6 +90,83 @@ def remember_campaign(campaign):
         return None
 
 
+def remember_feedback(feedback):
+    """Persist campaign feedback to AgentCore Memory so future generations learn from it.
+
+    Each feedback submission (especially thumbs-down with text) becomes a memory event
+    that semantic search can surface when generating future campaigns. This enables
+    the system to avoid repeating mistakes and respect reviewer preferences.
+    """
+    memory_id = os.environ.get('AGENTCORE_MEMORY_ID', '').strip()
+    if not memory_id:
+        return None
+
+    # Only write meaningful feedback to memory (thumbs-down, or thumbs-up with text)
+    rating = feedback.get('rating', '')
+    feedback_text = (feedback.get('feedback_text') or '').strip()
+    if rating == 'up' and not feedback_text:
+        # Thumbs-up without text doesn't add useful information to memory
+        return None
+
+    week_id = feedback.get('week_id', 'unknown')
+    asset_type = feedback.get('asset_type', 'unknown')
+
+    # Build a natural-language memory event that semantic search will match
+    if rating == 'down':
+        sentiment = 'negative'
+        prefix = f"Reviewer disliked the {asset_type} content for week {week_id}."
+    else:
+        sentiment = 'positive'
+        prefix = f"Reviewer approved the {asset_type} content for week {week_id}."
+
+    memory_text = prefix
+    if feedback_text:
+        memory_text += f" Reviewer comment: {feedback_text}"
+
+    try:
+        client = _client()
+        response = client.create_event(
+            memoryId=memory_id,
+            actorId=feedback.get('created_by') or 'reviewer',
+            sessionId=f"campaign-feedback-{week_id}",
+            eventTimestamp=datetime.now(timezone.utc),
+            payload=[
+                {
+                    'conversational': {
+                        'content': {
+                            'text': memory_text
+                        },
+                        'role': 'USER'
+                    }
+                }
+            ],
+            branch={
+                'name': 'main'
+            },
+            metadata={
+                'week_id': {
+                    'stringValue': str(week_id)
+                },
+                'content_type': {
+                    'stringValue': 'campaign_feedback'
+                },
+                'asset_type': {
+                    'stringValue': str(asset_type)
+                },
+                'rating': {
+                    'stringValue': str(rating)
+                }
+            }
+        )
+        event = response.get('event') or {}
+        event_id = event.get('eventId') or response.get('eventId') or response.get('id')
+        print(f"Feedback memory event written: {event_id} ({sentiment} {asset_type} for {week_id})")
+        return event_id
+    except Exception as e:
+        print(f'AgentCore Memory feedback write failed (non-fatal): {e}')
+        return None
+
+
 def memory_search_query(chart_brief):
     tracks = ', '.join(
         track.get('track', '')

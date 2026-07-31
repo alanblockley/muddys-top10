@@ -45,6 +45,7 @@ from campaign_store import (
 )
 from infographic_templates import normalize_template_config, resolve_template, template_public_options
 from prompt_management import normalize_prompt_config
+from agent_memory import remember_feedback
 
 dynamodb = boto3.resource('dynamodb')
 tracks_table = dynamodb.Table(get_env('TRACKS_TABLE'))
@@ -1708,6 +1709,10 @@ def campaign_revision_feedback_put(event):
             'created_at': utc_now_iso(),
             'created_by': request_actor(event)
         })
+
+        # Write feedback to AgentCore Memory for future generation improvement
+        remember_feedback(feedback)
+
         return api_response(201, {'feedback': feedback})
     except ValueError as e:
         return api_response(400, {'error': str(e)})

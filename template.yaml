@@ -570,6 +570,7 @@ Resources:
           CAMPAIGN_DIAGNOSTICS_MODEL_MAX_TOKENS: '700'
           CAMPAIGN_DIAGNOSTICS_MODEL_TEMPERATURE: '0.1'
           CAMPAIGN_DIAGNOSTICS_MODEL_READ_TIMEOUT_SECONDS: '30'
+          AGENTCORE_MEMORY_ID: !GetAtt AgenticMemory.MemoryId
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref TracksTable
@@ -648,6 +649,11 @@ Resources:
                   - secretsmanager:GetSecretValue
                 Resource: !Ref CampaignModelApiKeySecretArn
           - !Ref AWS::NoValue
+        - Statement:
+            - Effect: Allow
+              Action:
+                - bedrock-agentcore:CreateEvent
+              Resource: !GetAtt AgenticMemory.MemoryArn
       Events:
         GetHistory:
           Type: Api
