@@ -862,94 +862,109 @@ def list_infographic_templates(event):
 
 
 def upload_infographic_template(event):
-    """Upload a named infographic template (HTML or PNG)."""
+    """Generate a presigned S3 upload URL for a named infographic template, or register after upload."""
     try:
         body = parse_json_body(event)
-        name = str(body.get('name') or '').strip()
-        if not name or len(name) > 100:
-            return api_response(400, {'error': 'Template name is required (max 100 characters)'})
+        action = str(body.get('action') or 'presign').strip()
 
-        filename = str(body.get('filename') or '').strip()
-        content_type = str(body.get('content_type') or '').lower().strip()
-        data = str(body.get('data') or '')
+        if action == 'presign':
+            # Step 1: Generate presigned URL for direct S3 upload
+            name = str(body.get('name') or '').strip()
+            if not name or len(name) > 100:
+                return api_response(400, {'error': 'Template name is required (max 100 characters)'})
 
-        # Handle data URI prefix
-        if ',' in data and data.startswith('data:'):
-            header, data = data.split(',', 1)
-            if not content_type and ';' in header:
-                content_type = header[5:].split(';', 1)[0].lower()
+            filename = str(body.get('filename') or '').strip()
+            content_type = str(body.get('content_type') or '').lower().strip()
 
-        allowed_types = {
-            'image/png': 'png',
-            'text/html': 'html',
-            'application/html': 'html',
-        }
-        if content_type not in allowed_types:
-            return api_response(400, {'error': 'Template must be PNG or HTML file'})
-
-        try:
-            raw = base64.b64decode(data, validate=True)
-        except (binascii.Error, ValueError):
-            return api_response(400, {'error': 'File data must be valid base64'})
-
-        max_bytes = 5 * 1024 * 1024
-        if not raw or len(raw) > max_bytes:
-            return api_response(400, {'error': 'Template file must be between 1 byte and 5 MB'})
-
-        bucket = os.environ.get('CAMPAIGN_ASSETS_BUCKET')
-        if not bucket:
-            raise RuntimeError('CAMPAIGN_ASSETS_BUCKET is not configured')
-
-        ext = allowed_types[content_type]
-        safe_name = re.sub(r'[^A-Za-z0-9_.-]', '-', name).strip('-') or 'template'
-        timestamp = utc_now_iso().replace(':', '-')
-        key = f'templates/uploads/{safe_name}-{timestamp}.{ext}'
-
-        s3_client.put_object(
-            Bucket=bucket,
-            Key=key,
-            Body=raw,
-            ContentType=content_type,
-            CacheControl='private, max-age=31536000',
-            Metadata={
-                'uploaded_by': request_actor(event) or '',
-                'template_name': name,
-                'source_filename': filename
+            allowed_types = {
+                'image/png': 'png',
+                'text/html': 'html',
+                'application/html': 'html',
             }
-        )
+            if content_type not in allowed_types:
+                return api_response(400, {'error': 'Template must be PNG or HTML file'})
 
-        # Store template metadata in config
-        templates = get_config_value('infographic_template_uploads') or []
-        new_template = {
-            'name': name,
-            'filename': filename,
-            's3_key': key,
-            'content_type': content_type,
-            'size_bytes': len(raw),
-            'uploaded_at': utc_now_iso(),
-            'uploaded_by': request_actor(event)
-        }
-        templates.append(new_template)
-        config_table.put_item(Item={
-            'configKey': 'infographic_template_uploads',
-            'value': templates
-        })
+            bucket = os.environ.get('CAMPAIGN_ASSETS_BUCKET')
+            if not bucket:
+                raise RuntimeError('CAMPAIGN_ASSETS_BUCKET is not configured')
 
-        # Generate presigned URL for immediate display
-        try:
-            new_template['url'] = s3_client.generate_presigned_url(
-                'get_object',
-                Params={'Bucket': bucket, 'Key': key},
-                ExpiresIn=3600
+            ext = allowed_types[content_type]
+            safe_name = re.sub(r'[^A-Za-z0-9_.-]', '-', name).strip('-') or 'template'
+            timestamp = utc_now_iso().replace(':', '-')
+            key = f'templates/uploads/{safe_name}-{timestamp}.{ext}'
+
+            presigned_url = s3_client.generate_presigned_url(
+                'put_object',
+                Params={
+                    'Bucket': bucket,
+                    'Key': key,
+                    'ContentType': content_type,
+                },
+                ExpiresIn=600  # 10 minutes to complete upload
             )
-        except Exception:
-            new_template['url'] = None
 
-        return api_response(201, {'template': new_template, 'templates': templates})
+            return api_response(200, {
+                'upload_url': presigned_url,
+                's3_key': key,
+                'bucket': bucket,
+                'content_type': content_type,
+                'expires_in': 600
+            })
+
+        elif action == 'register':
+            # Step 2: Register the uploaded template in config after S3 upload completes
+            name = str(body.get('name') or '').strip()
+            s3_key = str(body.get('s3_key') or '').strip()
+            content_type = str(body.get('content_type') or '').strip()
+            filename = str(body.get('filename') or '').strip()
+            size_bytes = body.get('size_bytes') or 0
+
+            if not name or not s3_key:
+                return api_response(400, {'error': 'name and s3_key are required for registration'})
+
+            # Verify the object exists in S3
+            bucket = os.environ.get('CAMPAIGN_ASSETS_BUCKET')
+            try:
+                head = s3_client.head_object(Bucket=bucket, Key=s3_key)
+                size_bytes = head.get('ContentLength', size_bytes)
+            except Exception:
+                return api_response(400, {'error': 'Upload not found in S3. Please upload the file first.'})
+
+            templates = get_config_value('infographic_template_uploads') or []
+            new_template = {
+                'name': name,
+                'filename': filename,
+                's3_key': s3_key,
+                'content_type': content_type,
+                'size_bytes': int(size_bytes),
+                'uploaded_at': utc_now_iso(),
+                'uploaded_by': request_actor(event)
+            }
+            templates.append(new_template)
+            config_table.put_item(Item={
+                'configKey': 'infographic_template_uploads',
+                'value': templates
+            })
+
+            # Generate presigned GET URL for immediate display
+            try:
+                new_template['url'] = s3_client.generate_presigned_url(
+                    'get_object',
+                    Params={'Bucket': bucket, 'Key': s3_key},
+                    ExpiresIn=3600
+                )
+            except Exception:
+                new_template['url'] = None
+
+            return api_response(201, {'template': new_template, 'templates': templates})
+
+        else:
+            return api_response(400, {'error': 'action must be "presign" or "register"'})
+
     except ValueError as e:
         return api_response(400, {'error': str(e)})
     except Exception as e:
-        print(f"Error uploading infographic template: {e}")
+        print(f"Error in infographic template upload: {e}")
         return api_response(500, {'error': str(e)})
 
 

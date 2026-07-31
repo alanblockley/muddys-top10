@@ -4725,13 +4725,6 @@
             }
 
             const file = fileInput.files[0];
-            const maxSize = 5 * 1024 * 1024;
-            if (file.size > maxSize) {
-                errorDiv.textContent = 'File is too large (max 5 MB).';
-                errorDiv.style.display = 'block';
-                return;
-            }
-
             let content_type = '';
             if (file.name.toLowerCase().endsWith('.png')) content_type = 'image/png';
             else if (file.name.toLowerCase().endsWith('.html') || file.name.toLowerCase().endsWith('.htm')) content_type = 'text/html';
@@ -4742,29 +4735,68 @@
             }
 
             submitBtn.disabled = true;
-            submitBtn.textContent = 'Uploading...';
+            submitBtn.textContent = 'Getting upload URL...';
 
             try {
-                const arrayBuffer = await file.arrayBuffer();
-                const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
-
-                const response = await fetch(`${CONFIG.apiEndpoint}/config/infographic-templates`, {
+                // Step 1: Get presigned upload URL from API
+                const presignResponse = await fetch(`${CONFIG.apiEndpoint}/config/infographic-templates`, {
                     method: 'POST',
                     headers: {
                         'Authorization': accessToken,
                         'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({
+                        action: 'presign',
                         name: name,
                         filename: file.name,
-                        content_type: content_type,
-                        data: base64
+                        content_type: content_type
                     })
                 });
 
-                if (!response.ok) {
-                    const err = await response.json().catch(() => ({}));
-                    throw new Error(err.error || `Upload failed (${response.status})`);
+                if (!presignResponse.ok) {
+                    const err = await presignResponse.json().catch(() => ({}));
+                    throw new Error(err.error || `Failed to get upload URL (${presignResponse.status})`);
+                }
+
+                const presignData = await presignResponse.json();
+                const uploadUrl = presignData.upload_url;
+                const s3Key = presignData.s3_key;
+
+                // Step 2: Upload file directly to S3 via presigned URL
+                submitBtn.textContent = 'Uploading file...';
+                const uploadResponse = await fetch(uploadUrl, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': content_type
+                    },
+                    body: file
+                });
+
+                if (!uploadResponse.ok) {
+                    throw new Error(`S3 upload failed (${uploadResponse.status})`);
+                }
+
+                // Step 3: Register the template in the API
+                submitBtn.textContent = 'Registering...';
+                const registerResponse = await fetch(`${CONFIG.apiEndpoint}/config/infographic-templates`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': accessToken,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        action: 'register',
+                        name: name,
+                        filename: file.name,
+                        content_type: content_type,
+                        s3_key: s3Key,
+                        size_bytes: file.size
+                    })
+                });
+
+                if (!registerResponse.ok) {
+                    const err = await registerResponse.json().catch(() => ({}));
+                    throw new Error(err.error || `Registration failed (${registerResponse.status})`);
                 }
 
                 closeTemplateUploadModal();
