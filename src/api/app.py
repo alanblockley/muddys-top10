@@ -543,7 +543,11 @@ def enrich_campaign_logo_url(campaign_branding):
 
 
 def enrich_infographic_template_reference_url(infographic_template):
-    key = infographic_template.get('reference_png_key')
+    # For uploaded templates, use the uploaded file as the preview
+    if infographic_template.get('source') == 'uploaded' and infographic_template.get('s3_key'):
+        key = infographic_template['s3_key']
+    else:
+        key = infographic_template.get('reference_png_key')
     bucket = os.environ.get('CAMPAIGN_ASSETS_BUCKET')
     if not key or not bucket:
         return infographic_template
