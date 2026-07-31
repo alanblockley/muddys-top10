@@ -72,7 +72,7 @@ CLASSIC_CHART_POSTER_CSS = """
 def normalize_template_config(config):
     config = config if isinstance(config, dict) else {}
     source = str(config.get('source') or DEFAULT_TEMPLATE_CONFIG['source'])
-    if source not in {'built_in', 's3'}:
+    if source not in {'built_in', 's3', 'uploaded'}:
         source = DEFAULT_TEMPLATE_CONFIG['source']
 
     template_id = sanitize_template_token(
@@ -91,6 +91,21 @@ def normalize_template_config(config):
         'reference_png_key': str(config.get('reference_png_key') or '').strip(),
         'reference_png_generated_at': str(config.get('reference_png_generated_at') or '').strip()
     }
+
+    if source == 'uploaded':
+        normalized['s3_key'] = str(config.get('s3_key') or '').strip()
+        normalized['name'] = str(config.get('name') or '').strip()
+        normalized['content_type'] = str(config.get('content_type') or '').strip()
+        if not normalized['s3_key']:
+            return {
+                **dict(DEFAULT_TEMPLATE_CONFIG),
+                'reference_png_key': normalized['reference_png_key'],
+                'reference_png_generated_at': normalized['reference_png_generated_at']
+            }
+        # For uploaded PNG templates, use the s3_key as the reference PNG
+        if normalized['s3_key'].lower().endswith('.png') and not normalized['reference_png_key']:
+            normalized['reference_png_key'] = normalized['s3_key']
+        return normalized
 
     if source == 's3':
         normalized['s3_html_key'] = str(config.get('s3_html_key') or '').strip()
