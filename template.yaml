@@ -618,7 +618,9 @@ Resources:
             - Effect: Allow
               Action:
                 - s3:PutObject
-              Resource: !Sub '${CampaignAssetsBucket.Arn}/branding/*'
+              Resource:
+                - !Sub '${CampaignAssetsBucket.Arn}/branding/*'
+                - !Sub '${CampaignAssetsBucket.Arn}/templates/*'
             - Effect: Allow
               Action:
                 - bedrock-agentcore:InvokeAgentRuntime
