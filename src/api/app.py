@@ -47,6 +47,8 @@ from infographic_templates import normalize_template_config, resolve_template, t
 from prompt_management import normalize_prompt_config
 from agent_memory import remember_feedback
 
+from botocore.config import Config as BotoConfig
+
 dynamodb = boto3.resource('dynamodb')
 tracks_table = dynamodb.Table(get_env('TRACKS_TABLE'))
 config_table = dynamodb.Table(get_env('CONFIG_TABLE'))
@@ -55,7 +57,7 @@ campaigns_table = dynamodb.Table(get_env('CAMPAIGNS_TABLE'))
 secrets_client = boto3.client('secretsmanager')
 lambda_client = boto3.client('lambda')
 agentcore_client = boto3.client('bedrock-agentcore')
-s3_client = boto3.client('s3')
+s3_client = boto3.client('s3', config=BotoConfig(signature_version='s3v4'))
 logs_client = boto3.client('logs')
 
 # Store PKCE verifiers temporarily (in production, use DynamoDB with TTL)
