@@ -122,6 +122,19 @@ def normalize_template_config(config):
 
 def resolve_template(config=None, s3_client=None, bucket=None):
     normalized = normalize_template_config(config)
+    if normalized['source'] == 'uploaded':
+        # Uploaded templates provide a reference PNG for model-based generation.
+        # Include classic poster HTML/CSS as fallback for deterministic rendering.
+        option = TEMPLATE_OPTIONS.get(DEFAULT_TEMPLATE_ID, {})
+        return {
+            **option,
+            **normalized,
+            'name': normalized.get('name') or 'Uploaded template',
+            'description': 'Uploaded reference template — model uses the PNG, fallback uses classic poster',
+            'html': CLASSIC_CHART_POSTER_HTML,
+            'css': CLASSIC_CHART_POSTER_CSS
+        }
+
     if normalized['source'] == 's3':
         html = read_s3_text(s3_client, bucket, normalized['s3_html_key'])
         css = read_s3_text(s3_client, bucket, normalized['s3_css_key'])
