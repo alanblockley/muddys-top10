@@ -4701,6 +4701,22 @@
                         ${tpl.url && tpl.content_type === 'image/png' ? `<a href="${escapeHtml(tpl.url)}" target="_blank" style="color: #818cf8; font-size: 0.85em;">View</a>` : ''}
                     </div>
                 `).join('');
+
+                // Add uploaded templates to the layout dropdown
+                const select = document.getElementById('infographicTemplateId');
+                if (select) {
+                    const currentValue = select.value;
+                    templates.forEach(tpl => {
+                        const optionId = 'uploaded_' + tpl.s3_key;
+                        if (!select.querySelector(`option[value="${CSS.escape(optionId)}"]`)) {
+                            const option = document.createElement('option');
+                            option.value = optionId;
+                            option.textContent = `${tpl.name} (${tpl.content_type === 'image/png' ? 'PNG' : 'HTML'})`;
+                            select.appendChild(option);
+                        }
+                    });
+                    if (currentValue) select.value = currentValue;
+                }
             } catch (e) {
                 container.innerHTML = '<span style="color: #ef4444;">Failed to load templates.</span>';
             }
