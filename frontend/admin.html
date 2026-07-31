@@ -4399,9 +4399,13 @@
                 updateFontPreview();
                 renderInfographicTemplateOptions(data.campaign_infographic_template_options || []);
                 const infographicTemplate = data.campaign_infographic_template || {};
-                setSelectValue('infographicTemplateId', infographicTemplate.template_id || 'classic_chart_poster');
+                await loadTemplateUploadsList();
+                if (infographicTemplate.source === 'uploaded' && infographicTemplate.s3_key) {
+                    setSelectValue('infographicTemplateId', 'uploaded_' + infographicTemplate.s3_key);
+                } else {
+                    setSelectValue('infographicTemplateId', infographicTemplate.template_id || 'classic_chart_poster');
+                }
                 updateTemplateReferenceStatus(infographicTemplate);
-                loadTemplateUploadsList();
                 populateCampaignPromptSettings(data.campaign_prompts || {});
 
                 hideLoading();
@@ -4511,11 +4515,25 @@
                     text_color: document.getElementById('brandingTextColor').value,
                     font_family: document.getElementById('brandingFontFamily').value
                 };
-                const templateConfig = {
-                    template_id: document.getElementById('infographicTemplateId').value,
-                    version: '1',
-                    source: 'built_in'
-                };
+                const templateValue = document.getElementById('infographicTemplateId').value;
+                let templateConfig;
+                if (templateValue.startsWith('uploaded_')) {
+                    const s3Key = templateValue.replace('uploaded_', '');
+                    const selectedOption = document.getElementById('infographicTemplateId').selectedOptions[0];
+                    templateConfig = {
+                        template_id: 'uploaded',
+                        version: '1',
+                        source: 'uploaded',
+                        s3_key: s3Key,
+                        name: selectedOption ? selectedOption.textContent.trim() : ''
+                    };
+                } else {
+                    templateConfig = {
+                        template_id: templateValue,
+                        version: '1',
+                        source: 'built_in'
+                    };
+                }
 
                 const response = await fetch(`${CONFIG.apiEndpoint}/config`, {
                     method: 'PUT',
