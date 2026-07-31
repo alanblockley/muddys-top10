@@ -2210,26 +2210,6 @@
                         </div>
                     </div>
 
-                    <!-- Template Upload Modal -->
-                    <div id="templateUploadModal" class="campaign-modal" onclick="if(event.target===this)closeTemplateUploadModal()">
-                        <div class="campaign-modal-panel" role="dialog" aria-modal="true" style="max-width: 540px;">
-                            <button class="campaign-modal-close" onclick="closeTemplateUploadModal()">Close</button>
-                            <h3 style="color: #e4e8f0; margin-bottom: 16px;">Upload Infographic Template</h3>
-                            <p class="help-text" style="margin-bottom: 16px;">Upload an HTML layout or PNG reference image. Each upload is named for easy identification.</p>
-                            <div class="form-group">
-                                <label for="templateUploadName">Template Name:</label>
-                                <input type="text" id="templateUploadName" placeholder="e.g., Dark neon poster v2" maxlength="100">
-                            </div>
-                            <div class="form-group">
-                                <label for="templateUploadFile">File (HTML or PNG):</label>
-                                <input type="file" id="templateUploadFile" accept=".html,.htm,.png" style="color: #94a3b8;">
-                                <p class="help-text" style="margin-top: 4px;">Max 5 MB. Accepted formats: .html, .png</p>
-                            </div>
-                            <div id="templateUploadPreview" style="margin-bottom: 12px;"></div>
-                            <div id="templateUploadError" style="color: #ef4444; margin-bottom: 12px; display: none;"></div>
-                            <button id="templateUploadSubmitBtn" onclick="submitTemplateUpload()" class="btn" type="button">Upload</button>
-                        </div>
-                    </div>
                 </div>
             </div>
                 <div class="card">
@@ -5065,5 +5045,26 @@
 
         window.addEventListener('resize', fitInfographicPreview);
     </script>
+
+    <!-- Template Upload Modal (top-level so it's not hidden by tab display:none) -->
+    <div id="templateUploadModal" class="campaign-modal" onclick="if(event.target===this)closeTemplateUploadModal()">
+        <div class="campaign-modal-panel" role="dialog" aria-modal="true" style="max-width: 540px;">
+            <button class="campaign-modal-close" onclick="closeTemplateUploadModal()">Close</button>
+            <h3 style="color: #e4e8f0; margin-bottom: 16px;">Upload Infographic Template</h3>
+            <p class="help-text" style="margin-bottom: 16px;">Upload an HTML layout or PNG reference image. Each upload is named for easy identification.</p>
+            <div class="form-group">
+                <label for="templateUploadName">Template Name:</label>
+                <input type="text" id="templateUploadName" placeholder="e.g., Dark neon poster v2" maxlength="100">
+            </div>
+            <div class="form-group">
+                <label for="templateUploadFile">File (HTML or PNG):</label>
+                <input type="file" id="templateUploadFile" accept=".html,.htm,.png" style="color: #94a3b8;">
+                <p class="help-text" style="margin-top: 4px;">Max 5 MB. Accepted formats: .html, .png</p>
+            </div>
+            <div id="templateUploadPreview" style="margin-bottom: 12px;"></div>
+            <div id="templateUploadError" style="color: #ef4444; margin-bottom: 12px; display: none;"></div>
+            <button id="templateUploadSubmitBtn" onclick="submitTemplateUpload()" class="btn" type="button">Upload</button>
+        </div>
+    </div>
 </body>
 </html>
