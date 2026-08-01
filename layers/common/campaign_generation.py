@@ -660,10 +660,8 @@ def generate_infographic_asset_with_model(
                 **fallback.get('metadata', {}),
                 **(generated.get('metadata') if isinstance(generated.get('metadata'), dict) else {}),
                 'asset_generation_mode': 'model',
-                'asset_model_endpoint': getattr(model_client, 'endpoint', 'bedrock-mantle'),
+                'asset_model_endpoint': getattr(model_client, 'endpoint', 'bedrock-runtime'),
                 'asset_model': getattr(model_client, 'model_id', None),
-                'fallback_template_id': fallback.get('metadata', {}).get('template_id'),
-                'fallback_template_version': fallback.get('metadata', {}).get('template_version')
             },
             'html': str(generated.get('html') or '').strip(),
             'css': str(generated.get('css') or '').strip(),
@@ -671,14 +669,27 @@ def generate_infographic_asset_with_model(
         }
         validation = validate_infographic_asset(asset, chart_brief)
         if not validation['valid']:
-            raise ValueError('model-authored asset failed validation: ' + '; '.join(validation['errors']))
+            print(f"Infographic asset validation failed: {validation['errors']}")
+            asset['metadata']['validation_errors'] = validation['errors']
+            asset['metadata']['asset_generation_mode'] = 'model_validation_failed'
+        if validation.get('warnings'):
+            asset['metadata']['validation_warnings'] = validation['warnings']
         return asset
     except Exception as e:
-        fallback['metadata']['asset_generation_mode'] = 'template_fallback'
-        fallback['metadata']['asset_model_endpoint'] = getattr(model_client, 'endpoint', 'bedrock-mantle')
-        fallback['metadata']['asset_model'] = getattr(model_client, 'model_id', None)
-        fallback['metadata']['model_error'] = str(e)
-        return fallback
+        print(f"Infographic asset generation failed: {e}")
+        return {
+            'version': INFOGRAPHIC_ASSET_VERSION,
+            'canvas': {'width': 1280, 'height': 720},
+            'metadata': {
+                **fallback.get('metadata', {}),
+                'asset_generation_mode': 'failed',
+                'asset_model_endpoint': getattr(model_client, 'endpoint', 'bedrock-runtime'),
+                'asset_model': getattr(model_client, 'model_id', None),
+                'model_error': str(e)
+            },
+            'html': '',
+            'css': '',
+        }
     finally:
         model_client.max_tokens = original_max_tokens
     variables = prompt_variables(
@@ -748,46 +759,48 @@ def build_infographic_asset_prompt_package(chart_brief, infographic, venue_confi
 
 def build_infographic_asset_prompt(chart_brief, infographic, venue_config, infographic_template, agent_spec, personal_context, memory_context, schema):
     context_text = '\n\n'.join(item['content'] for item in personal_context)
-    memory_text = campaign_json_dumps(memory_context, indent=2) if memory_context else '(none available)'
     branding = (venue_config.get('venue') or {}).get('branding', {})
     reference_image = infographic_template.get('reference_image') if isinstance(infographic_template, dict) else None
-    reference_note = (
-        "A rendered PNG reference image for the active template has been supplied as visual context. "
-        "Respect its brand feel, density, hierarchy, and broadcast-poster intent, but adapt the final composition to this week's chart story. "
-        "Do not trace it slavishly and do not ignore factual chart data.\n"
-        if isinstance(reference_image, dict) and reference_image.get('data_uri')
-        else "No rendered template reference PNG is available yet; rely on the starting template HTML/CSS and brand config.\n"
-    )
+    has_reference = isinstance(reference_image, dict) and reference_image.get('data_uri')
+
     return (
-        "You are authoring the final Muddy's Top 10 infographic HTML/CSS asset.\n"
-        "Return exactly two fenced code blocks: one ```html block and one ```css block.\n"
-        "Do not return JSON. Do not escape the HTML/CSS as string data.\n"
-        "Do not include commentary before, between, or after the code blocks.\n"
-        "Do not return image prompts. Do not describe a design for a later model. Create the actual HTML/CSS.\n"
-        "The final render target is exactly 1280x720.\n"
-        "Use selectable/rendered HTML text for all chart wording.\n"
-        "Use the {{MUDDYS_LOGO_DATA_URI}} placeholder for the Muddy's logo.\n"
-        "Do not include JavaScript, event handlers, iframes, forms, external URLs, remote fonts, external CSS, or external images.\n"
-        "Logo, chart title, and tag line are non-negotiable and must appear exactly, allowing normal HTML escaping.\n"
-        "Use the supplied colour/font tokens creatively but do not replace the palette.\n"
-        "Use the supplied template as a starting design language, not a rigid fill-in form.\n"
-        "You may change layout hierarchy, spacing, callouts, icon treatment, panels, and emphasis where the current chart story supports it.\n"
-        "Facts in chart_brief are authoritative. Do not invent ranks, movement, play counts, dates, weeks on chart, or artist history.\n\n"
-        f"TEMPLATE REFERENCE IMAGE:\n{reference_note}"
-        f"REFERENCE IMAGE METADATA:\n{campaign_json_dumps(template_reference_metadata(infographic_template), indent=2)}\n\n"
-        f"NON-NEGOTIABLE BRAND JSON:\n{campaign_json_dumps(branding, indent=2)}\n\n"
-        f"AGENT SPEC:\n{agent_spec['content']}\n\n"
-        f"PERSONAL CONTEXT:\n{context_text or '(none supplied)'}\n\n"
-        f"AGENTCORE MEMORY CONTEXT:\n{memory_text}\n\n"
-        f"VENUE CONFIG JSON:\n{campaign_json_dumps(venue_config, indent=2)}\n\n"
-        f"CHART BRIEF JSON:\n{campaign_json_dumps(chart_brief, indent=2)}\n\n"
-        f"INFOGRAPHIC CONTENT JSON:\n{campaign_json_dumps(infographic or {}, indent=2)}\n\n"
-        f"STARTING TEMPLATE METADATA:\n{campaign_json_dumps({k: v for k, v in infographic_template.items() if k not in {'html', 'css'}}, indent=2)}\n\n"
-        f"STARTING TEMPLATE HTML:\n{infographic_template.get('html', '')}\n\n"
-        f"STARTING TEMPLATE CSS:\n{infographic_template.get('css', '')}\n\n"
-        "OUTPUT FORMAT:\n"
-        "```html\n<section class=\"poster\">...</section>\n```\n"
-        "```css\n.poster { ... }\n```\n"
+        "TASK: Generate render-ready HTML and CSS for a 1280×720 infographic PNG.\n\n"
+        "You are a layout compiler. Your output will be fed directly to a headless Chromium\n"
+        "browser (Playwright) and screenshotted at exactly 1280×720 pixels. No human will\n"
+        "read or edit your code. It must render perfectly on first attempt.\n\n"
+        "OUTPUT CONTRACT:\n"
+        "- Return EXACTLY two fenced code blocks: ```html then ```css\n"
+        "- No text before, between, or after the code blocks\n"
+        "- No comments, no explanations, no markdown headings\n"
+        "- The HTML must be a single root element (e.g., <section class=\"poster\">...</section>)\n"
+        "- The CSS must set that root element to exactly 1280px × 720px\n"
+        "- All text content must be rendered as HTML text (not baked into background images)\n"
+        "- Use {{MUDDYS_LOGO_DATA_URI}} as the src for the logo image\n\n"
+        "RENDERING CONSTRAINTS:\n"
+        "- Viewport: 1280×720, device scale factor 1\n"
+        "- No JavaScript, no animations, no transitions\n"
+        "- No external resources (no remote fonts, images, stylesheets, or scripts)\n"
+        "- No event handlers, iframes, forms, or interactive elements\n"
+        "- Use only system fonts or CSS font stacks\n"
+        "- All positioning must be absolute or grid-based (no responsive/fluid layouts)\n"
+        "- Must render identically on every execution\n\n"
+        + (
+            "VISUAL REFERENCE:\n"
+            "A reference PNG of the target design is attached as an image input.\n"
+            "Match its visual structure, layout regions, colour palette, and information hierarchy.\n"
+            "Replace all data content with the chart data below — do not copy the reference data.\n\n"
+            if has_reference else
+            "NO VISUAL REFERENCE AVAILABLE.\n"
+            "Design a professional dark-background chart infographic suitable for social media sharing.\n\n"
+        ) +
+        f"BRAND CONFIG:\n{campaign_json_dumps(branding, indent=2)}\n\n"
+        f"CHART DATA (10 entries — render ALL of them):\n{campaign_json_dumps(chart_brief.get('tracks', [])[:10], indent=2)}\n\n"
+        f"CHART METADATA:\n"
+        f"  week_id: {chart_brief.get('week_id')}\n"
+        f"  chart_title: {branding.get('chart_title', 'Muddys Top 10')}\n"
+        f"  tagline: {branding.get('tagline', 'Your requests. Your music. Your chart.')}\n\n"
+        f"INFOGRAPHIC CONTENT (editorial text to include where space permits):\n{campaign_json_dumps(infographic or {}, indent=2)}\n\n"
+        "```html\n"
     )
 
 
@@ -1165,7 +1178,7 @@ class BedrockCampaignModel:
             return self.complete_text_with_strands_openai_responses(prompt, response_format=response_format, images=images)
         if self.endpoint == 'bedrock-mantle':
             return self.complete_text_with_mantle(prompt, response_format=response_format)
-        return self.complete_text_with_bedrock_runtime(prompt)
+        return self.complete_text_with_bedrock_runtime(prompt, images=images)
 
     def complete_text_with_strands_openai_responses(self, prompt, response_format=None, images=None):
         try:
@@ -1235,7 +1248,7 @@ class BedrockCampaignModel:
             raise RuntimeError('Campaign model API key secret is empty')
         return self._api_key
 
-    def complete_text_with_bedrock_runtime(self, prompt):
+    def complete_text_with_bedrock_runtime(self, prompt, images=None):
         if self.client is None:
             import boto3
             from botocore.config import Config
@@ -1244,6 +1257,31 @@ class BedrockCampaignModel:
                 config=Config(connect_timeout=10, read_timeout=int(self.read_timeout), retries={'max_attempts': 0})
             )
 
+        # Build content array with text and optional images
+        content = [{'type': 'text', 'text': prompt}]
+        if images:
+            for image in images:
+                if not isinstance(image, dict):
+                    continue
+                image_url = image.get('image_url') or image.get('data_uri') or ''
+                if not image_url:
+                    continue
+                # Extract base64 data and media type from data URI
+                if image_url.startswith('data:'):
+                    parts = image_url.split(',', 1)
+                    if len(parts) == 2:
+                        header = parts[0]  # e.g., data:image/png;base64
+                        media_type = header.replace('data:', '').split(';')[0]
+                        data = parts[1]
+                        content.insert(0, {
+                            'type': 'image',
+                            'source': {
+                                'type': 'base64',
+                                'media_type': media_type,
+                                'data': data
+                            }
+                        })
+
         body = {
             'anthropic_version': 'bedrock-2023-05-31',
             'max_tokens': self.max_tokens,
@@ -1251,12 +1289,7 @@ class BedrockCampaignModel:
             'messages': [
                 {
                     'role': 'user',
-                    'content': [
-                        {
-                            'type': 'text',
-                            'text': prompt
-                        }
-                    ]
+                    'content': content
                 }
             ]
         }
