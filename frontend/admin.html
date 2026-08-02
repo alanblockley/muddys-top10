@@ -415,6 +415,55 @@
             margin-top: 5px;
         }
 
+        .campaign-progress-label.processing::after {
+            content: '';
+            animation: dots 1.5s steps(4, end) infinite;
+        }
+
+        @keyframes dots {
+            0% { content: ''; }
+            25% { content: '.'; }
+            50% { content: '..'; }
+            75% { content: '...'; }
+            100% { content: ''; }
+        }
+
+        .infographic-tabs {
+            display: flex;
+            gap: 0;
+            margin-bottom: 12px;
+            border-bottom: 1px solid #334155;
+        }
+
+        .infographic-tab {
+            padding: 8px 16px;
+            border: none;
+            background: transparent;
+            color: #94a3b8;
+            font-size: 0.9em;
+            font-weight: 600;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: color 0.15s, border-color 0.15s;
+        }
+
+        .infographic-tab:hover {
+            color: #e2e8f0;
+        }
+
+        .infographic-tab.active {
+            color: #a78bfa;
+            border-bottom-color: #a78bfa;
+        }
+
+        .infographic-tab-panel {
+            display: none;
+        }
+
+        .infographic-tab-panel.active {
+            display: block;
+        }
+
         .campaign-detail {
             background: #0a0e1a;
             border: 1px solid #1e293b;
@@ -2640,7 +2689,9 @@
 
         async function loadCampaigns() {
             const list = document.getElementById('campaignList');
-            list.innerHTML = '<div style="padding: 15px; color: #94a3b8;">Loading campaigns...</div>';
+            if (!window.campaignsLoaded) {
+                list.innerHTML = '<div style="padding: 15px; color: #94a3b8;">Loading campaigns...</div>';
+            }
 
             try {
                 const data = await campaignApi('/campaigns?limit=50', {
@@ -2852,7 +2903,7 @@
                             <span class="status-pill status-${status}">${status}</span><br>
                             Generated: ${escapeHtml(generated)}<br>
                             By: ${escapeHtml(campaign.generated_by || 'unknown')}
-                            ${progress ? `<span class="campaign-progress-label">${escapeHtml(progress)}</span>` : ''}
+                            ${progress ? `<span class="campaign-progress-label${campaign.status === 'processing' ? ' processing' : ''}">${escapeHtml(progress)}</span>` : ''}
                         </div>
                     </div>
                 `;
@@ -3362,62 +3413,63 @@
 
         function renderInfographicAssetPanel(campaign, options = {}) {
             const showTools = options.showTools !== false;
-            if (campaign.infographic_png && campaign.infographic_png.url) {
-                const pngDownloadUrl = campaign.infographic_png.download_url || campaign.infographic_png.url;
-                return `
-                    <div class="preview-block">
-                        <h4>Infographic PNG</h4>
-                        <p>Final generated campaign image, rendered server-side and stored with this campaign.</p>
-                        ${showTools ? `<div class="infographic-tools">
-                            <a href="${escapeHtml(pngDownloadUrl)}" class="btn" download>Download PNG</a>
-                            <button onclick="copyInfographicInput()" class="btn btn-secondary">Copy Source Asset JSON</button>
+            const hasPng = campaign.infographic_png && campaign.infographic_png.url;
+            const hasAsset = campaign.infographic_asset && campaign.infographic_asset.html;
+
+            if (!hasPng && !hasAsset) {
+                const chartTracks = ((campaign.chart_brief || {}).tracks || []).slice(0, 10);
+                if (chartTracks.length < 10) {
+                    return `
+                        <div class="preview-block">
+                            <h4>Infographic</h4>
+                            <p style="color: #94a3b8;">Needs 10 chart rows before an infographic can be generated.</p>
                         </div>
-                        ${renderAssetFeedbackControls('infographic', 'infographic PNG')}` : ''}
-                        <img class="campaign-png-preview" src="${escapeHtml(campaign.infographic_png.url)}" alt="Generated Muddy's Top 10 infographic for week ${escapeHtml(campaign.week_id || '')}">
-                    </div>
-                `;
-            }
-
-            if (campaign.infographic_asset) {
+                    `;
+                }
                 return `
                     <div class="preview-block">
-                        <h4>Infographic Asset Preview</h4>
-                        <p>PNG has not been generated for this campaign. Showing the stored HTML/CSS source asset preview instead.</p>
-                        ${showTools ? `<div class="infographic-tools">
-                            <button onclick="downloadStoredInfographicPng()" class="btn">Download PNG</button>
-                            <button onclick="copyInfographicInput()" class="btn btn-secondary">Copy Stored Asset JSON</button>
-                        </div>
-                        ${renderAssetFeedbackControls('infographic', 'infographic asset')}` : ''}
-                        <iframe id="storedInfographicFrame" class="campaign-asset-frame" sandbox srcdoc="${escapeHtml(storedInfographicDocument(campaign.infographic_asset))}"></iframe>
+                        <h4>Infographic</h4>
+                        <p style="color: #94a3b8;">No infographic has been generated for this campaign yet.</p>
                     </div>
                 `;
             }
 
-            const chartTracks = ((campaign.chart_brief || {}).tracks || []).slice(0, 10);
-            if (chartTracks.length < 10) {
-                return `
-                    <div class="preview-block">
-                        <h4>Infographic Asset Preview</h4>
-                        <p>Needs 10 chart rows before a 1280x720 infographic can be previewed.</p>
-                    </div>
-                `;
-            }
+            // Build tabs
+            const pngTab = hasPng ? `<button class="infographic-tab active" onclick="switchInfographicTab(event, 'png')">PNG Output</button>` : '';
+            const htmlTab = hasAsset ? `<button class="infographic-tab${!hasPng ? ' active' : ''}" onclick="switchInfographicTab(event, 'html')">HTML Render</button>` : '';
 
-            const input = buildInfographicRenderInput(campaign);
-            return `
-                    <div class="preview-block">
-                        <h4>Infographic Asset Preview</h4>
-                        <p>Browser-rendered dev preview of the final 1280x720 layout contract. This is for UI validation before the server-side Playwright asset pipeline is wired in.</p>
+            const pngDownloadUrl = hasPng ? (campaign.infographic_png.download_url || campaign.infographic_png.url) : '';
+            const pngPanel = hasPng ? `
+                <div class="infographic-tab-panel${hasPng ? ' active' : ''}" id="infographicTabPng">
                     ${showTools ? `<div class="infographic-tools">
-                        <button onclick="downloadInfographicPng()" class="btn">Download PNG</button>
-                        <button onclick="copyInfographicInput()" class="btn btn-secondary">Copy Render JSON</button>
+                        <a href="${escapeHtml(pngDownloadUrl)}" class="btn" download>Download PNG</a>
+                        <button onclick="copyInfographicInput()" class="btn btn-secondary">Copy Source JSON</button>
                     </div>
-                    ${renderAssetFeedbackControls('infographic', 'infographic preview')}` : ''}
-                    <div class="infographic-viewport" id="infographicViewport">
-                        ${renderInfographicFrame(input)}
+                    ${renderAssetFeedbackControls('infographic', 'infographic PNG')}` : ''}
+                    <img class="campaign-png-preview" src="${escapeHtml(campaign.infographic_png.url)}" alt="Generated Muddy's Top 10 infographic for week ${escapeHtml(campaign.week_id || '')}">
+                </div>
+            ` : '';
+
+            const htmlPanel = hasAsset ? `
+                <div class="infographic-tab-panel${!hasPng ? ' active' : ''}" id="infographicTabHtml">
+                    ${showTools ? `<div class="infographic-tools">
+                        <button onclick="downloadStoredInfographicPng()" class="btn">Download as PNG</button>
+                        <button onclick="copyInfographicInput()" class="btn btn-secondary">Copy Asset JSON</button>
+                    </div>` : ''}
+                    <iframe id="storedInfographicFrame" class="campaign-asset-frame" sandbox srcdoc="${escapeHtml(storedInfographicDocument(campaign.infographic_asset))}"></iframe>
+                </div>
+            ` : '';
+
+            return `
+                <div class="preview-block">
+                    <h4>Infographic</h4>
+                    <div class="infographic-tabs">
+                        ${pngTab}${htmlTab}
                     </div>
+                    ${pngPanel}${htmlPanel}
                 </div>
             `;
+        }
         }
 
         function renderInfographicValidation(validation) {
@@ -3484,6 +3536,17 @@
             } finally {
                 hideLoading();
             }
+        }
+
+        function switchInfographicTab(event, tabId) {
+            // Deactivate all tabs and panels
+            const container = event.target.closest('.preview-block');
+            container.querySelectorAll('.infographic-tab').forEach(t => t.classList.remove('active'));
+            container.querySelectorAll('.infographic-tab-panel').forEach(p => p.classList.remove('active'));
+            // Activate selected
+            event.target.classList.add('active');
+            const panel = container.querySelector(`#infographicTab${tabId.charAt(0).toUpperCase() + tabId.slice(1)}`);
+            if (panel) panel.classList.add('active');
         }
 
         function storedInfographicDocument(asset) {
