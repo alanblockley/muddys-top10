@@ -238,7 +238,7 @@ def create_chart_campaign(args):
                 if security_errors:
                     raise RuntimeError(f"Infographic asset validation failed: {', '.join(security_errors)}")
             set_progress(progress_week_id, 'rendering_infographic_png', 'Rendering the final infographic PNG.')
-            campaign['infographic_png'] = render_infographic_png(campaign)
+            campaign['infographic_png'] = render_infographic_png(campaign, chart_brief=chart_brief)
         set_progress(progress_week_id, 'saving_campaign', 'Saving generated campaign assets and metadata.')
         campaign['campaign_progress'] = {
             'stage': 'complete',
@@ -274,13 +274,13 @@ def set_progress(week_id, stage, message, status='processing', error=None):
         print(f"Failed to update campaign progress for {week_id}: {e}")
 
 
-def render_infographic_png(campaign):
+def render_infographic_png(campaign, chart_brief=None):
     """Render the infographic PNG via AntV chart data path."""
     function_name = os.environ.get('INFOGRAPHIC_RENDERER_FUNCTION_NAME')
     if not function_name:
         raise RuntimeError('INFOGRAPHIC_RENDERER_FUNCTION_NAME is not configured')
 
-    chart_brief = campaign.get('chart_brief') or {}
+    chart_brief = chart_brief or campaign.get('chart_brief') or {}
     infographic = campaign.get('infographic') or {}
     branding = ((campaign.get('infographic_asset') or {}).get('metadata') or {}).get('brand_config_snapshot') or {}
 
