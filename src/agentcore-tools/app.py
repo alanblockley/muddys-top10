@@ -228,9 +228,15 @@ def create_chart_campaign(args):
         parent_revision_id = existing.get('active_revision_id') if existing else None
         campaign = merge_regenerated_sections(existing, generated, sections) if existing else generated
         if 'infographic' in sections:
+            # Skip infographic_asset validation for AntV path — the renderer
+            # takes chart_data directly, no HTML/CSS asset needed
             validation = campaign.get('infographic_asset_validation') or {}
-            if validation and not validation.get('valid', False):
-                raise RuntimeError(f"Infographic asset validation failed: {', '.join(validation.get('errors') or [])}")
+            if validation and not validation.get('valid', True):
+                errors = validation.get('errors') or []
+                # Only block on security errors, not content warnings
+                security_errors = [e for e in errors if 'blocked content' in e]
+                if security_errors:
+                    raise RuntimeError(f"Infographic asset validation failed: {', '.join(security_errors)}")
             set_progress(progress_week_id, 'rendering_infographic_png', 'Rendering the final infographic PNG.')
             campaign['infographic_png'] = render_infographic_png(campaign)
         set_progress(progress_week_id, 'saving_campaign', 'Saving generated campaign assets and metadata.')
@@ -269,22 +275,54 @@ def set_progress(week_id, stage, message, status='processing', error=None):
 
 
 def render_infographic_png(campaign):
-    model_png = render_model_infographic_png(campaign)
-    if model_png:
-        return model_png
-
+    """Render the infographic PNG via AntV chart data path."""
     function_name = os.environ.get('INFOGRAPHIC_RENDERER_FUNCTION_NAME')
     if not function_name:
         raise RuntimeError('INFOGRAPHIC_RENDERER_FUNCTION_NAME is not configured')
-    if not campaign.get('infographic_asset'):
-        raise RuntimeError('Campaign is missing infographic_asset; cannot render PNG')
+
+    chart_brief = campaign.get('chart_brief') or {}
+    infographic = campaign.get('infographic') or {}
+    branding = ((campaign.get('infographic_asset') or {}).get('metadata') or {}).get('brand_config_snapshot') or {}
+
+    # Build the chart_data payload for the AntV renderer
+    tracks = chart_brief.get('tracks', [])[:10]
+    chart_data = {
+        'week_id': campaign.get('week_id', 'unknown'),
+        'chart_title': branding.get('chart_title') or "Muddy's Top 10",
+        'tagline': branding.get('tagline') or 'Your requests. Your music. Your chart.',
+        'week_display': chart_brief.get('week_display') or f"Week of {campaign.get('week_id', '')}",
+        'headline': infographic.get('headline') or infographic.get('chart_story', ''),
+        'chart_story': infographic.get('chart_story') or '',
+        'tracks': [
+            {
+                'rank': track.get('rank', i + 1),
+                'artist': track.get('artist') or track.get('track', '').split(' - ')[0] if ' - ' in track.get('track', '') else track.get('track', ''),
+                'title': track.get('title') or (track.get('track', '').split(' - ', 1)[1] if ' - ' in track.get('track', '') else ''),
+                'plays': track.get('play_count', 0),
+                'movement': track.get('movement', 'same'),
+                'delta': track.get('movement_delta'),
+            }
+            for i, track in enumerate(tracks)
+        ],
+        'stats': {
+            'new_entries': len([t for t in tracks if t.get('movement') == 'new']),
+            'climbers': len([t for t in tracks if t.get('movement') == 'up']),
+            'fallers': len([t for t in tracks if t.get('movement') == 'down']),
+            'non_movers': len([t for t in tracks if t.get('movement') == 'same']),
+        },
+        'show': {
+            'time': '2AM SLT',
+            'day': 'EVERY SATURDAY',
+            'presenters': 'DJ TOOHEY & JP'
+        }
+    }
 
     response = lambda_client.invoke(
         FunctionName=function_name,
         InvocationType='RequestResponse',
         Payload=json.dumps({
-            'week_id': campaign['week_id'],
-            'infographic_asset': campaign['infographic_asset']
+            'chart_data': chart_data,
+            'week_id': campaign.get('week_id')
         }).encode('utf-8')
     )
     raw_payload = response.get('Payload').read().decode('utf-8')
