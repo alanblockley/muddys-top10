@@ -1,26 +1,15 @@
 /**
  * Muddy's Top 10 Chart Poster — AntV Infographic Custom Template
  * 
- * Renders a 1280×720 chart poster with:
- * - Header: logo, chart title, week date range
- * - Chart: 10 ranked entries with artist, title, plays, movement
- * - Sidebar: chart story + stats
- * - Footer: show time, presenters, tagline
- * 
- * Uses renderToString for SSR (no browser needed).
+ * Uses dynamic import() for @antv/infographic since it requires ESM (lodash-es).
  */
-const { renderToString } = require('@antv/infographic/ssr');
 const { Resvg } = require('@resvg/resvg-js');
 
 const CANVAS_WIDTH = 1280;
 const CANVAS_HEIGHT = 720;
 
 /**
- * Build the AntV infographic syntax for the Muddy's Top 10 chart poster.
- * 
- * This uses the built-in list-row template with customised data structure.
- * For a fully custom layout, we'd register a custom structure — but the
- * built-in vertical list gives us a clean ranked list which is the core need.
+ * Build the AntV infographic syntax for the chart poster.
  */
 function buildChartPosterSyntax(data) {
   const trackLines = data.tracks.map(t => {
@@ -60,16 +49,14 @@ ${trackLines}
 
 /**
  * Render chart data to SVG string using AntV Infographic SSR.
+ * Uses dynamic import() since @antv/infographic requires ESM.
  */
 async function renderToSvg(data, options = {}) {
   const syntax = buildChartPosterSyntax(data);
+  const { renderToString } = await import('@antv/infographic/ssr');
   const svg = await renderToString(syntax, {
     width: options.width || CANVAS_WIDTH,
     height: options.height || CANVAS_HEIGHT,
-    themeConfig: {
-      colorPrimary: '#a855f7',
-      colorBg: '#0a0014',
-    }
   });
   return svg;
 }
@@ -80,15 +67,13 @@ async function renderToSvg(data, options = {}) {
 async function renderToPng(data, options = {}) {
   const svg = await renderToSvg(data, options);
   
-  // Force the SVG to 1280×720 by adjusting the root element attributes
-  const targetWidth = CANVAS_WIDTH;
-  const targetHeight = CANVAS_HEIGHT;
+  // Force the SVG to 1280×720
   const adjustedSvg = svg
-    .replace(/width="[^"]*"/, `width="${targetWidth}"`)
-    .replace(/height="[^"]*"/, `height="${targetHeight}"`);
+    .replace(/width="[^"]*"/, `width="${CANVAS_WIDTH}"`)
+    .replace(/height="[^"]*"/, `height="${CANVAS_HEIGHT}"`);
   
   const resvg = new Resvg(adjustedSvg, {
-    fitTo: { mode: 'width', value: targetWidth },
+    fitTo: { mode: 'width', value: CANVAS_WIDTH },
     background: '#0a0014'
   });
   
