@@ -1,23 +1,83 @@
 const { GetObjectCommand, PutObjectCommand } = require("@aws-sdk/client-s3");
 const { S3Client } = require("@aws-sdk/client-s3");
-const chromium = require("@sparticuz/chromium");
-const { chromium: playwrightChromium } = require("playwright-core");
 const { readFileSync } = require("node:fs");
 const { join } = require("node:path");
+const { renderToPng } = require("./chart-poster");
 
 const s3 = new S3Client({});
 const CANVAS_WIDTH = 1280;
 const CANVAS_HEIGHT = 720;
 
 exports.lambda_handler = async (event) => {
-  const asset = validateAsset(event.infographic_asset || event.asset);
-  const weekId = requireString(event.week_id || asset.metadata?.week_id, "week_id", 32);
   const bucket = process.env.CAMPAIGN_ASSETS_BUCKET;
   if (!bucket) {
     throw new Error("CAMPAIGN_ASSETS_BUCKET is not configured");
   }
 
-  const documentHtml = await buildDocument(asset, bucket);
+  // Route: AntV chart data path (new) vs legacy HTML/CSS path
+  if (event.chart_data) {
+    return renderChartPoster(event, bucket);
+  }
+  return renderLegacyHtmlCss(event, bucket);
+};
+
+/**
+ * New path: Render chart data via AntV Infographic SSR → PNG
+ */
+async function renderChartPoster(event, bucket) {
+  const chartData = event.chart_data;
+  const weekId = safeToken(chartData.week_id || event.week_id || "unknown", "week");
+
+  // Render to PNG
+  const result = await renderToPng(chartData);
+  if (result.width !== CANVAS_WIDTH || result.height !== CANVAS_HEIGHT) {
+    console.warn(`Output dimensions ${result.width}x${result.height}, expected ${CANVAS_WIDTH}x${CANVAS_HEIGHT}`);
+  }
+
+  // Upload to S3
+  const generatedAt = new Date().toISOString();
+  const outputPrefix = safePrefix(event.output_prefix || `campaigns/${weekId}`);
+  const filenamePrefix = safeToken(event.filename_prefix || "infographic", "infographic");
+  const key = `${outputPrefix}/${filenamePrefix}-${generatedAt.replace(/[:.]/g, "-")}.png`;
+
+  await s3.send(new PutObjectCommand({
+    Bucket: bucket,
+    Key: key,
+    Body: result.png,
+    ContentType: "image/png",
+    CacheControl: "private, max-age=31536000",
+    Metadata: {
+      week_id: weekId,
+      renderer: "antv-infographic",
+      svg_length: String(result.svgLength)
+    }
+  }));
+
+  return {
+    ok: true,
+    infographic_png: {
+      bucket,
+      key,
+      content_type: "image/png",
+      width: result.width,
+      height: result.height,
+      size_bytes: result.png.length,
+      generated_at: generatedAt,
+      renderer: "antv-infographic"
+    }
+  };
+}
+
+/**
+ * Legacy path: Render HTML/CSS via Playwright (kept for backward compat)
+ */
+async function renderLegacyHtmlCss(event, bucket) {
+  // Lazy-load Playwright only when needed (heavy deps)
+  const chromium = require("@sparticuz/chromium");
+  const { chromium: playwrightChromium } = require("playwright-core");
+
+  const asset = validateAsset(event.infographic_asset || event.asset);
+  const weekId = requireString(event.week_id || asset.metadata?.week_id, "week_id", 32);
   const browser = await playwrightChromium.launch({
     args: chromium.args,
     executablePath: await chromium.executablePath(),
