@@ -286,6 +286,20 @@ def render_infographic_png(campaign):
 
     # Build the chart_data payload for the AntV renderer
     tracks = chart_brief.get('tracks', [])[:10]
+    print(f"Infographic renderer: {len(tracks)} tracks from chart_brief for week {campaign.get('week_id')}")
+
+    def extract_artist(track):
+        if track.get('artist'):
+            return track['artist']
+        combined = track.get('track', '')
+        return combined.split(' - ', 1)[0].strip() if ' - ' in combined else combined
+
+    def extract_title(track):
+        if track.get('title'):
+            return track['title']
+        combined = track.get('track', '')
+        return combined.split(' - ', 1)[1].strip() if ' - ' in combined else ''
+
     chart_data = {
         'week_id': campaign.get('week_id', 'unknown'),
         'chart_title': branding.get('chart_title') or "Muddy's Top 10",
@@ -296,11 +310,11 @@ def render_infographic_png(campaign):
         'tracks': [
             {
                 'rank': track.get('rank', i + 1),
-                'artist': track.get('artist') or track.get('track', '').split(' - ')[0] if ' - ' in track.get('track', '') else track.get('track', ''),
-                'title': track.get('title') or (track.get('track', '').split(' - ', 1)[1] if ' - ' in track.get('track', '') else ''),
-                'plays': track.get('play_count', 0),
+                'artist': extract_artist(track),
+                'title': extract_title(track),
+                'plays': track.get('play_count') or track.get('plays', 0),
                 'movement': track.get('movement', 'same'),
-                'delta': track.get('movement_delta'),
+                'delta': track.get('movement_delta') or track.get('delta'),
             }
             for i, track in enumerate(tracks)
         ],

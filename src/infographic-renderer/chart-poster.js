@@ -65,12 +65,24 @@ async function renderToSvg(data, options = {}) {
  * Render chart data to PNG buffer at exactly 1280×720.
  */
 async function renderToPng(data, options = {}) {
+  // Log what we received for debugging
+  const trackCount = (data.tracks || []).length;
+  console.log(`chart-poster renderToPng: ${trackCount} tracks, week=${data.week_id}, title=${data.chart_title}`);
+  if (trackCount === 0) {
+    console.warn('chart-poster: No tracks in data! PNG will be empty.');
+  }
+
   const svg = await renderToSvg(data, options);
   
-  // Force the SVG to 1280×720
-  const adjustedSvg = svg
-    .replace(/width="[^"]*"/, `width="${CANVAS_WIDTH}"`)
-    .replace(/height="[^"]*"/, `height="${CANVAS_HEIGHT}"`);
+  // Extract original viewBox dimensions and scale to fill 1280x720
+  const viewBoxMatch = svg.match(/viewBox="([^"]+)"/);
+  let adjustedSvg = svg;
+  if (viewBoxMatch) {
+    // Keep the original viewBox (content coordinates) but set display size to 1280x720
+    adjustedSvg = svg
+      .replace(/width="[^"]*"/, `width="${CANVAS_WIDTH}"`)
+      .replace(/height="[^"]*"/, `height="${CANVAS_HEIGHT}"`);
+  }
   
   const resvg = new Resvg(adjustedSvg, {
     fitTo: { mode: 'width', value: CANVAS_WIDTH },
@@ -78,6 +90,7 @@ async function renderToPng(data, options = {}) {
   });
   
   const rendered = resvg.render();
+  console.log(`chart-poster PNG: ${rendered.width}x${rendered.height}, ${rendered.asPng().length} bytes`);
   return {
     png: rendered.asPng(),
     width: rendered.width,
