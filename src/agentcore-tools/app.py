@@ -288,26 +288,6 @@ def render_infographic_png(campaign, chart_brief=None):
     tracks = chart_brief.get('tracks', [])[:10]
     print(f"Infographic renderer: {len(tracks)} tracks from chart_brief for week {campaign.get('week_id')}")
 
-    # TEMPORARY: Use sample data when chart_brief has no tracks (testing infographic rendering)
-    if not tracks:
-        print("Infographic renderer: Using SAMPLE DATA (no tracks in chart_brief)")
-        tracks = [
-            {'rank': 1, 'artist': 'Olivia Dean', 'title': 'Man I Need', 'play_count': 33, 'movement': 'up', 'movement_delta': 3},
-            {'rank': 2, 'artist': 'Alex Warren', 'title': 'FEVER DREAM', 'play_count': 30, 'movement': 'up', 'movement_delta': 1},
-            {'rank': 3, 'artist': 'Bruno Mars', 'title': 'I Just Might', 'play_count': 29, 'movement': 'down', 'movement_delta': -2},
-            {'rank': 4, 'artist': 'BTS', 'title': 'SWIM', 'play_count': 29, 'movement': 'down', 'movement_delta': -2},
-            {'rank': 5, 'artist': 'Harry Styles', 'title': 'Ready, Steady, Go!', 'play_count': 23, 'movement': 'up', 'movement_delta': 2},
-            {'rank': 6, 'artist': 'The Weeknd', 'title': 'Open Hearts', 'play_count': 20, 'movement': 'new', 'movement_delta': None},
-            {'rank': 7, 'artist': 'Dua Lipa', 'title': 'Illusion', 'play_count': 18, 'movement': 'down', 'movement_delta': -3},
-            {'rank': 8, 'artist': 'Sabrina Carpenter', 'title': 'Taste', 'play_count': 16, 'movement': 'up', 'movement_delta': 4},
-            {'rank': 9, 'artist': 'Billie Eilish', 'title': 'Birds of a Feather', 'play_count': 14, 'movement': 'same', 'movement_delta': 0},
-            {'rank': 10, 'artist': 'Taylor Swift', 'title': 'Fortnight', 'play_count': 12, 'movement': 'reentry', 'movement_delta': None},
-        ]
-        infographic = {
-            'headline': 'Olivia Dean takes the crown after three weeks climbing',
-            'chart_story': 'A new number one emerges as Olivia Dean rises from four to claim the top spot.'
-        }
-
     def extract_artist(track):
         if track.get('artist'):
             return track['artist']
