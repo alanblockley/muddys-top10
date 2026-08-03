@@ -30,10 +30,9 @@ function buildPosterHtml(data) {
     return `<tr class="track-row ${movementClass}">
       <td class="rank">${t.rank}</td>
       <td class="track-info">
-        <span class="artist">${escapeHtml(t.artist)}</span>
-        <span class="title">${escapeHtml(t.title)}</span>
+        <span class="artist">${escapeHtml(t.artist)}</span><span class="title">${escapeHtml(t.title)}</span>
       </td>
-      <td class="plays">${t.plays}</td>
+      <td class="plays">${t.plays}<span class="plays-label">plays</span></td>
       <td class="movement"><span class="movement-icon">${movementIcon}</span><span class="movement-delta">${deltaText}</span></td>
     </tr>`;
   }).join('\n');
@@ -56,11 +55,10 @@ html, body {
   width: ${CANVAS_WIDTH}px;
   height: ${CANVAS_HEIGHT}px;
   display: grid;
-  grid-template-rows: 90px 1fr 70px;
-  background: radial-gradient(ellipse at 80% 0%, rgba(168,85,247,0.15), transparent 50%),
-              radial-gradient(ellipse at 20% 100%, rgba(217,70,239,0.1), transparent 40%),
-              linear-gradient(135deg, #050008 0%, #0a0020 50%, #020617 100%);
-  padding: 16px 24px;
+  grid-template-rows: 140px 1fr 100px;
+  background: url('assets/background.png') center/cover no-repeat;
+  padding: 16px 24px 18px 24px;
+  position: relative;
 }
 
 /* Header */
@@ -71,33 +69,103 @@ html, body {
   border-bottom: 2px solid rgba(168,85,247,0.5);
   padding-bottom: 12px;
 }
+.header-logo {
+  width: 127px;
+  height: 127px;
+  object-fit: contain;
+  filter: drop-shadow(0 0 8px rgba(168,85,247,0.5));
+  position: absolute;
+  top: 12px;
+  left: 16px;
+  z-index: 10;
+}
 .header-title {
   flex: 1;
+  padding-left: 145px;
 }
 .header-title h1 {
-  font-size: 36px;
+  font-size: 42px;
   font-weight: 900;
   text-transform: uppercase;
-  letter-spacing: 0.03em;
-  text-shadow: 0 2px 8px rgba(168,85,247,0.4);
+  letter-spacing: 0.05em;
+  font-family: 'Arial Black', 'Arial Narrow', 'Impact', sans-serif;
+  color: #f8fafc;
+  text-shadow: 0 2px 12px rgba(168,85,247,0.5);
+}
+.header-title h1 .venue-name {
+  display: block;
+  font-family: 'Segoe Script', 'Brush Script MT', 'Lucida Handwriting', cursive;
+  font-size: 36px;
+  font-weight: 700;
+  text-transform: none;
+  letter-spacing: 0.01em;
+  color: #facc15;
+  text-shadow: 0 0 10px rgba(250,204,21,0.3);
+}
+.header-title h1 .chart-name {
+  display: block;
+  font-family: 'Arial Black', 'Impact', sans-serif;
+  font-size: 32px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #f8fafc;
+  text-shadow: 0 2px 12px rgba(168,85,247,0.5);
+}
+.header-title .subtitle {
+  font-size: 16px;
+  font-weight: 700;
+  color: #facc15;
+  text-transform: none;
+  letter-spacing: 0.02em;
+  margin-top: -8px;
+  font-family: 'Trebuchet MS', sans-serif;
+  text-shadow: 0 0 10px rgba(250,204,21,0.4);
+  text-align: center;
+  position: absolute;
+  left: 0;
+  right: 0;
+}
+.header-title .subtitle::before {
+  content: '✦ ';
+  color: #a855f7;
+}
+.header-title .subtitle::after {
+  content: ' ✦';
+  color: #a855f7;
 }
 .header-title h1 .accent { color: #a855f7; }
 .header-week {
   text-align: right;
-  border: 1px solid #a855f7;
-  padding: 8px 14px;
-  border-radius: 4px;
+  padding: 8px 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  height: 100%;
 }
-.header-week .date { font-size: 16px; font-weight: 700; color: #facc15; }
+.header-week .tagline-accent {
+  display: block;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #a855f7, #facc15);
+  margin: 8px 0;
+  border-radius: 1px;
+}
+.header-week .tagline {
+  font-size: 22px;
+  font-weight: 700;
+  color: #facc15;
+  font-style: italic;
+  letter-spacing: 0.02em;
+}
 .header-week .headline { font-size: 11px; color: #e2e8f0; margin-top: 2px; }
 
 /* Chart Table */
 .chart-section {
   display: grid;
-  grid-template-columns: 1fr 280px;
+  grid-template-columns: 1fr 1fr;
   gap: 16px;
   padding: 12px 0;
-  overflow: hidden;
+  overflow: visible;
 }
 .chart-table {
   width: 100%;
@@ -109,43 +177,49 @@ html, body {
   vertical-align: middle;
 }
 .track-row .rank {
-  font-size: 24px;
+  font-size: 22px;
   font-weight: 900;
-  width: 40px;
+  width: 44px;
+  height: 36px;
   text-align: center;
-  color: #a855f7;
+  color: #ffffff;
+  background: linear-gradient(135deg, #a855f7, #6d28d9);
+  border-radius: 4px;
+  line-height: 36px;
 }
 .track-row .track-info {
   padding-left: 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .track-row .artist {
-  display: block;
-  font-size: 15px;
+  font-size: 19px;
   font-weight: 800;
-  color: #f8fafc;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 420px;
+  color: #a855f7;
 }
 .track-row .title {
-  display: block;
-  font-size: 13px;
-  color: #cbd5e1;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 420px;
+  font-size: 19px;
+  color: #f8fafc;
+  margin-left: 8px;
 }
 .track-row .plays {
   font-size: 16px;
   font-weight: 700;
   color: #facc15;
   text-align: center;
-  width: 50px;
+  width: 42px;
+  line-height: 1.1;
+}
+.track-row .plays-label {
+  display: block;
+  font-size: 8px;
+  color: #94a3b8;
+  text-transform: uppercase;
+  font-weight: 600;
 }
 .track-row .movement {
-  width: 80px;
+  width: 110px;
   text-align: center;
 }
 .track-row .movement-icon {
@@ -166,78 +240,189 @@ html, body {
 .sidebar {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-}
-.chart-story {
-  background: rgba(168,85,247,0.08);
-  border: 1px solid rgba(168,85,247,0.3);
-  border-radius: 6px;
-  padding: 12px;
-}
-.chart-story h3 {
-  color: #facc15;
-  font-size: 13px;
-  text-transform: uppercase;
-  margin-bottom: 6px;
-}
-.chart-story p {
-  font-size: 12px;
-  line-height: 1.4;
-  color: #e2e8f0;
-}
-.stats-panel {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
   gap: 8px;
 }
-.stat-box {
-  background: rgba(0,0,0,0.4);
-  border: 1px solid rgba(168,85,247,0.2);
-  border-radius: 4px;
-  padding: 8px;
+.chart-talk-header {
   text-align: center;
-}
-.stat-box .stat-number {
-  font-size: 22px;
+  font-size: 18px;
   font-weight: 900;
   color: #facc15;
-}
-.stat-box .stat-label {
-  font-size: 10px;
   text-transform: uppercase;
-  color: #94a3b8;
+  letter-spacing: 0.05em;
+  background: linear-gradient(90deg, transparent 10%, rgba(250,204,21,0.15) 50%, transparent 90%);
+  padding: 4px 0;
 }
+.chart-talk-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr 1fr;
+  gap: 0;
+  border: 1px solid rgba(168,85,247,0.4);
+  flex: 1;
+}
+.chart-talk-cell {
+  border-bottom: 1px dotted rgba(168,85,247,0.3);
+  border-right: 1px dotted rgba(168,85,247,0.3);
+  padding: 6px 8px;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.chart-talk-cell:nth-child(2n) {
+  border-right: none;
+}
+.chart-talk-cell:nth-child(n+5) {
+  border-bottom: none;
+}
+.chart-talk-cell .cell-icon {
+  font-size: 28px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.chart-talk-cell .cell-text {
+  font-size: 16px;
+  line-height: 1.3;
+  color: #e2e8f0;
+  font-family: Arial, Helvetica, sans-serif;
+}
+.stats-strip {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 0;
+  border: 1px solid rgba(168,85,247,0.4);
+}
+.stats-strip-panel {
+  padding: 6px 8px;
+  border-right: 1px solid rgba(168,85,247,0.3);
+  text-align: center;
+}
+.stats-strip-panel:last-child {
+  border-right: none;
+}
+.stats-strip-panel .panel-title {
+  font-size: 9px;
+  font-weight: 700;
+  color: #facc15;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+.stats-strip-panel .panel-row {
+  font-size: 11px;
+  color: #e2e8f0;
+  line-height: 1.5;
+}
+.stats-strip-panel .panel-row .icon { margin-right: 4px; }
 
 /* Footer */
 .footer {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
+  gap: 0;
   border-top: 2px solid rgba(168,85,247,0.5);
   padding-top: 12px;
 }
 .footer-show {
-  font-size: 14px;
+  text-align: center;
+  line-height: 1.0;
 }
-.footer-show .day { color: #facc15; font-weight: 700; }
-.footer-show .time { color: #a855f7; font-weight: 700; }
-.footer-show .presenters { color: #e2e8f0; }
-.footer-tagline {
-  font-size: 13px;
-  color: #a855f7;
+.footer-show .line1 {
+  font-size: 16px;
+  color: #e2e8f0;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  margin-bottom: -2px;
+}
+.footer-show .line2 {
+  font-size: 26px;
+  color: #facc15;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  text-shadow: 0 0 12px rgba(250,204,21,0.4);
+  margin-bottom: -4px;
+}
+.footer-show .line3 {
+  font-size: 32px;
+  color: #ffffff;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  text-shadow: 0 2px 10px rgba(168,85,247,0.6);
+}
+.footer-compiled {
+  font-size: 16px;
+  color: #facc15;
   font-style: italic;
+  font-weight: 700;
+  text-align: right;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  letter-spacing: 0.02em;
+  margin-left: auto;
+}
+.footer-compiled .compiled-accent {
+  display: block;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #a855f7, #facc15);
+  margin: 8px 0;
+  border-radius: 1px;
+}
+.footer-divider {
+  width: 3px;
+  align-self: stretch;
+  background: linear-gradient(180deg, #a855f7, #facc15);
+  margin: 0 20px;
+  border-radius: 2px;
+}
+.footer-hosts {
+  text-align: left;
+}
+.footer-hosts .hosts-with {
+  font-size: 12px;
+  font-weight: 700;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-family: 'Arial Black', 'Impact', sans-serif;
+}
+.footer-hosts .hosts-names {
+  font-size: 22px;
+  font-weight: 900;
+  color: #f8fafc;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-family: 'Arial Black', 'Impact', sans-serif;
+}
+.footer-hosts .hosts-tagline1 {
+  font-size: 16px;
+  font-weight: 700;
+  color: #facc15;
+  font-family: 'Segoe Script', 'Brush Script MT', 'Lucida Handwriting', cursive;
+  text-shadow: 0 0 8px rgba(250,204,21,0.3);
+}
+.footer-hosts .hosts-tagline2 {
+  font-size: 16px;
+  font-weight: 700;
+  color: #facc15;
+  font-family: 'Segoe Script', 'Brush Script MT', 'Lucida Handwriting', cursive;
+  text-shadow: 0 0 8px rgba(250,204,21,0.3);
 }
 </style>
 </head>
 <body>
 <div class="poster">
   <div class="header">
+    <img class="header-logo" src="${escapeHtml(data.logo_url || 'assets/muddys-logo.png')}" alt="Muddy's Music Cafe">
     <div class="header-title">
-      <h1><span class="accent">Muddy's</span> ${escapeHtml(data.chart_title || 'Top 10')}</h1>
+      <h1><span class="venue-name">Muddy's Music Cafe</span><span class="chart-name">Top 10</span></h1>
+      <div class="subtitle">This Week - ${escapeHtml(data.week_display || '')}</div>
     </div>
     <div class="header-week">
-      <div class="date">${escapeHtml(data.week_display || '')}</div>
-      <div class="headline">${escapeHtml(data.headline || '')}</div>
+      <span class="tagline-accent"></span>
+      <div class="tagline">${escapeHtml(data.tagline || 'Your requests. Your music. Your chart.')}</div>
+      <span class="tagline-accent"></span>
     </div>
   </div>
 
@@ -248,26 +433,45 @@ html, body {
       </tbody>
     </table>
     <div class="sidebar">
-      <div class="chart-story">
-        <h3>Chart Story</h3>
-        <p>${escapeHtml(data.chart_story || '')}</p>
+      <div class="chart-talk-header">Chart Talk</div>
+      <div class="chart-talk-grid">
+        ${buildChartTalkCells(data)}
       </div>
-      <div class="stats-panel">
-        <div class="stat-box"><div class="stat-number">${stats.new_entries || 0}</div><div class="stat-label">New Entries</div></div>
-        <div class="stat-box"><div class="stat-number">${stats.climbers || 0}</div><div class="stat-label">Climbers</div></div>
-        <div class="stat-box"><div class="stat-number">${stats.fallers || 0}</div><div class="stat-label">Fallers</div></div>
-        <div class="stat-box"><div class="stat-number">${stats.non_movers || 0}</div><div class="stat-label">Non-Movers</div></div>
+      <div class="stats-strip">
+        <div class="stats-strip-panel">
+          <div class="panel-title">&nbsp;</div>
+        </div>
+        <div class="stats-strip-panel">
+          <div class="panel-title">&nbsp;</div>
+        </div>
+        <div class="stats-strip-panel">
+          <div class="panel-title">This Week's Stats</div>
+          <div class="panel-row"><span class="icon" style="color:#facc15">★</span>${stats.new_entries || 0} new entries</div>
+          <div class="panel-row"><span class="icon" style="color:#22c55e">▲</span>${stats.climbers || 0} climbers</div>
+          <div class="panel-row"><span class="icon" style="color:#ef4444">▼</span>${stats.fallers || 0} fallers</div>
+          <div class="panel-row"><span class="icon" style="color:#94a3b8">—</span>${stats.non_movers || 0} non-movers</div>
+        </div>
       </div>
     </div>
   </div>
 
   <div class="footer">
     <div class="footer-show">
-      <span class="day">${escapeHtml(show.day || 'EVERY SATURDAY')}</span>
-      <span class="time">${escapeHtml(show.time || '2AM SLT')}</span>
-      <span class="presenters">with ${escapeHtml(show.presenters || 'DJ TOOHEY & JP')}</span>
+      <div class="line1">Catch the Top 10</div>
+      <div class="line2">Every Saturday</div>
+      <div class="line3">At 2AM SLT</div>
     </div>
-    <div class="footer-tagline">${escapeHtml(data.tagline || 'Your requests. Your music. Your chart.')}</div>
+    <div class="footer-divider"></div>
+    <div class="footer-hosts">
+      <div class="hosts-with">With</div>
+      <div class="hosts-names">DJ Toohey &amp; JP</div>
+      <div class="hosts-tagline1">The Australian Dynamic Duo</div>
+    </div>
+    <div class="footer-compiled">
+      <span class="compiled-accent"></span>
+      Compiled from songs played by our DJs and patron requests
+      <span class="compiled-accent"></span>
+    </div>
   </div>
 </div>
 </body>
@@ -280,6 +484,81 @@ function escapeHtml(str) {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
+}
+
+function buildChartTalkCells(data) {
+  const tracks = data.tracks || [];
+  const cells = [];
+
+  // Cell 1: Number one story
+  const top = tracks[0];
+  if (top) {
+    if (top.movement === 'up') cells.push({ icon: '🏆', text: `${top.artist} takes #1, climbing ${top.delta} places this week` });
+    else if (top.movement === 'new') cells.push({ icon: '🏆', text: `${top.artist} debuts straight in at #1` });
+    else cells.push({ icon: '🏆', text: `${top.artist} holds the #1 spot for another week` });
+  }
+
+  // Cell 2: Biggest climber
+  const climbers = tracks.filter(t => t.movement === 'up' && t.delta);
+  if (climbers.length) {
+    const biggest = climbers.reduce((a, b) => (b.delta > a.delta ? b : a));
+    cells.push({ icon: '🚀', text: `${biggest.artist} rockets up ${biggest.delta} places to #${biggest.rank}` });
+  }
+
+  // Cell 3: New entry
+  const newEntries = tracks.filter(t => t.movement === 'new');
+  if (newEntries.length) {
+    cells.push({ icon: '⭐', text: `${newEntries[0].artist} is a brand new entry at #${newEntries[0].rank}` });
+  }
+
+  // Cell 4: Re-entry
+  const reentries = tracks.filter(t => t.movement === 'reentry');
+  if (reentries.length) {
+    cells.push({ icon: '🎵', text: `${reentries[0].artist} returns to the chart at #${reentries[0].rank}` });
+  } else {
+    // Filler: biggest faller
+    const fallers = tracks.filter(t => t.movement === 'down' && t.delta);
+    if (fallers.length) {
+      const biggest = fallers.reduce((a, b) => (Math.abs(b.delta) > Math.abs(a.delta) ? b : a));
+      cells.push({ icon: '🎵', text: `${biggest.artist} drops ${Math.abs(biggest.delta)} to #${biggest.rank}` });
+    }
+  }
+
+  // Cell 5: Non-mover / holding
+  const holds = tracks.filter(t => t.movement === 'same');
+  if (holds.length) {
+    cells.push({ icon: '🎶', text: `${holds[0].artist} holds steady at #${holds[0].rank}` });
+  }
+
+  // Cell 6: Chart story / headline
+  cells.push({ icon: '💬', text: data.headline || data.chart_story || 'Another week of great music at Muddy\'s' });
+
+  // Ensure exactly 6 cells
+  while (cells.length < 6) {
+    cells.push({ icon: '♪', text: 'Your requests shape the chart every week' });
+  }
+
+  return cells.slice(0, 6).map(cell => 
+    `<div class="chart-talk-cell"><span class="cell-icon">${cell.icon}</span><span class="cell-text">${escapeHtml(cell.text)}</span></div>`
+  ).join('\n');
+}
+
+function totalPlays(data) {
+  return (data.tracks || []).reduce((sum, t) => sum + (t.plays || 0), 0);
+}
+
+function formatWeekDate(weekId) {
+  if (!weekId) return '';
+  const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const parts = String(weekId).split('-');
+  if (parts.length !== 3) return weekId;
+  // week_id is the start date — closing date is 7 days later
+  const startDate = new Date(parseInt(parts[0]), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+  const closingDate = new Date(startDate.getTime() + 7 * 24 * 60 * 60 * 1000);
+  const day = closingDate.getDate();
+  const month = months[closingDate.getMonth()];
+  const year = closingDate.getFullYear();
+  return `${day} ${month} ${year}`;
 }
 
 /**

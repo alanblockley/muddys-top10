@@ -14,7 +14,7 @@ const { writeFileSync } = require('node:fs');
 const SAMPLE_DATA = {
   chart_title: "Top 10",
   tagline: "Your requests. Your music. Your chart.",
-  week_display: "JUL 25 – AUG 1, 2026",
+  week_display: "25 July – 1 August 2026",
   week_id: "2026-07-25",
   headline: "New number one as Olivia Dean takes the crown",
   chart_story: "After three weeks climbing steadily, Olivia Dean finally reaches the summit with Man I Need. Bruno Mars drops two places after a dominant three-week run at the top.",
