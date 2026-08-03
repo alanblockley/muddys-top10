@@ -126,13 +126,8 @@ SECTION_CONTEXT_MAP = {
         'radio-read-examples.md',
     },
     'infographic': _UNIVERSAL_CONTEXT_FILES | {
-        'infographic-design-principles.md',
-        'infographic-style-examples.md',
+        'infographic-editorial-framework.md',
         'chart-show-glossary.md',
-    },
-    'infographic_asset': _UNIVERSAL_CONTEXT_FILES | {
-        'infographic-design-principles.md',
-        'infographic-style-examples.md',
     },
     'social': _UNIVERSAL_CONTEXT_FILES | {
         'social-media-music-communities.md',
