@@ -96,6 +96,29 @@ The AI generates these 6 cells each week by selecting from the editorial categor
 - Icon: a Font Awesome icon class name (e.g., fa-trophy, fa-rocket, fa-star, fa-music, fa-fire, fa-arrow-up, fa-chart-line)
 - The AI must self-verify that text fits within these limits before returning
 
+## Available Data Per Track (use for richness)
+
+Each track in chart_brief includes:
+- `rank` — current position
+- `play_count` — plays this week
+- `movement` — up/down/new/same/reentry
+- `movement_delta` — positions gained/lost
+- `previous_rank` — last week's position
+- `weeks_on_chart` — total weeks this track has appeared
+- `best_rank` — highest position ever achieved
+- `last_seen_week` — for re-entries, when it was last charted
+
+Use these to write richer editorial:
+- "Now in its 8th week on the chart" (weeks_on_chart)
+- "Reaches a new peak at #3" (rank < best_rank means new peak)
+- "Returns after dropping out 4 weeks ago" (last_seen_week)
+- "Still below its peak of #1" (best_rank vs current rank)
+- Don't just state movement — explain what it MEANS for the artist
+
+## All 6 Cells Must Be Track-Specific
+
+Every Chart Talk cell must be about a specific artist and their story this week. No chart summarisations, no generic statements, no filler. Each cell = one artist = one story.
+
 ## Output Format
 
 The AI should return `chart_talk` as an array of exactly 6 objects:

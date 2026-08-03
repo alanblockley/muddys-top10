@@ -466,7 +466,7 @@ html, body {
       </div>
       <div class="stats-strip">
         <div class="stats-strip-panel">
-          <div class="panel-title">Headline</div>
+          <div class="panel-title">This Week's Story</div>
           <div class="panel-row" style="font-weight:700;color:#facc15;">${escapeHtml(data.headline || '')}</div>
         </div>
         <div class="stats-strip-panel">
@@ -576,7 +576,7 @@ function buildChartTalkCells(data) {
     addCell('fa-equals', 'HOLDS STEADY!', `${holds[0].artist} stays put at #${holds[0].rank}`, holds[0].artist);
   }
 
-  // 7. Second climber if we still need cells
+  // 7. Second climber or another track story
   if (cells.length < 6) {
     const moreClimbers = tracks.filter(t => t.movement === 'up' && t.delta && !usedArtists.has(t.artist));
     if (moreClimbers.length) {
@@ -585,16 +585,35 @@ function buildChartTalkCells(data) {
     }
   }
 
-  // 8. Total plays stat
+  // 8. Longest-running track
   if (cells.length < 6) {
-    const totalPlays = tracks.reduce((sum, t) => sum + (t.plays || 0), 0);
-    addCell('fa-chart-line', `${totalPlays} PLAYS!`, `Total plays counted across the Top 10 this week`, null);
+    const withWeeks = tracks.filter(t => t.weeks_on_chart && t.weeks_on_chart > 1 && !usedArtists.has(t.artist));
+    if (withWeeks.length) {
+      const longest = withWeeks.reduce((a, b) => ((b.weeks_on_chart || 0) > (a.weeks_on_chart || 0) ? b : a));
+      addCell('fa-clock', `${longest.weeks_on_chart} WEEKS!`, `${longest.artist} now in week ${longest.weeks_on_chart} on the chart`, longest.artist);
+    }
   }
 
-  // 9. Movement summary
+  // 9. Another faller or track at a new peak
   if (cells.length < 6) {
-    const stats = data.stats || {};
-    addCell('fa-bolt', 'CHART SHAKEUP!', `${stats.climbers || 0} climbers, ${stats.fallers || 0} fallers, ${stats.new_entries || 0} new`, null);
+    const newPeaks = tracks.filter(t => t.best_rank && t.rank <= t.best_rank && t.movement === 'up' && !usedArtists.has(t.artist));
+    if (newPeaks.length) {
+      addCell('fa-crown', 'NEW PEAK!', `${newPeaks[0].artist} reaches their highest ever position at #${newPeaks[0].rank}`, newPeaks[0].artist);
+    } else {
+      const moreFallers = tracks.filter(t => t.movement === 'down' && !usedArtists.has(t.artist));
+      if (moreFallers.length) {
+        addCell('fa-arrow-down', 'SLIPS BACK', `${moreFallers[0].artist} eases to #${moreFallers[0].rank}`, moreFallers[0].artist);
+      }
+    }
+  }
+
+  // 10. Any remaining track not yet covered
+  if (cells.length < 6) {
+    const unused = tracks.filter(t => !usedArtists.has(t.artist));
+    if (unused.length) {
+      const t = unused[0];
+      addCell('fa-music', `#${t.rank} THIS WEEK`, `${t.artist} sits at #${t.rank} with ${t.plays} plays`, t.artist);
+    }
   }
 
   return cells.slice(0, 6).map(cell => 
