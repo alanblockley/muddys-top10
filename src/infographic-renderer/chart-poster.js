@@ -1,9 +1,10 @@
 /**
  * Muddy's Top 10 Chart Poster — AntV Infographic Custom Template
  * 
- * Uses dynamic import() for @antv/infographic since it requires ESM (lodash-es).
+ * Renders chart data via AntV Infographic SSR to SVG, then uses
+ * Playwright (headless Chromium) to render the SVG to PNG since
+ * the SVG uses foreignObject which requires a browser engine.
  */
-const { Resvg } = require('@resvg/resvg-js');
 
 const CANVAS_WIDTH = 1280;
 const CANVAS_HEIGHT = 720;
@@ -49,7 +50,6 @@ ${trackLines}
 
 /**
  * Render chart data to SVG string using AntV Infographic SSR.
- * Uses dynamic import() since @antv/infographic requires ESM.
  */
 async function renderToSvg(data, options = {}) {
   const syntax = buildChartPosterSyntax(data);
@@ -62,10 +62,12 @@ async function renderToSvg(data, options = {}) {
 }
 
 /**
- * Render chart data to PNG buffer at exactly 1280×720.
+ * Render chart data to PNG buffer at 1280×720 using Playwright.
+ * 
+ * AntV's SVG uses foreignObject (HTML-in-SVG) which requires a
+ * browser engine to render text. resvg-js cannot handle this.
  */
 async function renderToPng(data, options = {}) {
-  // Log what we received for debugging
   const trackCount = (data.tracks || []).length;
   console.log(`chart-poster renderToPng: ${trackCount} tracks, week=${data.week_id}, title=${data.chart_title}`);
   if (trackCount === 0) {
@@ -73,30 +75,56 @@ async function renderToPng(data, options = {}) {
   }
 
   const svg = await renderToSvg(data, options);
-  
-  // Extract original viewBox dimensions and scale to fill 1280x720
-  const viewBoxMatch = svg.match(/viewBox="([^"]+)"/);
-  let adjustedSvg = svg;
-  if (viewBoxMatch) {
-    // Keep the original viewBox (content coordinates) but set display size to 1280x720
-    adjustedSvg = svg
-      .replace(/width="[^"]*"/, `width="${CANVAS_WIDTH}"`)
-      .replace(/height="[^"]*"/, `height="${CANVAS_HEIGHT}"`);
-  }
-  
-  const resvg = new Resvg(adjustedSvg, {
-    fitTo: { mode: 'width', value: CANVAS_WIDTH },
-    background: '#0a0014'
+  console.log(`chart-poster SVG: ${svg.length} chars`);
+
+  // Wrap SVG in an HTML document for Playwright rendering
+  const html = `<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { width: ${CANVAS_WIDTH}px; height: ${CANVAS_HEIGHT}px; overflow: hidden; background: #0a0014; }
+#container { width: ${CANVAS_WIDTH}px; height: ${CANVAS_HEIGHT}px; display: flex; align-items: center; justify-content: center; }
+#container svg { width: 100%; height: 100%; }
+</style>
+</head>
+<body>
+<div id="container">${svg}</div>
+</body>
+</html>`;
+
+  // Render with Playwright
+  const chromium = require('@sparticuz/chromium');
+  const { chromium: playwrightChromium } = require('playwright-core');
+
+  const browser = await playwrightChromium.launch({
+    args: chromium.args,
+    executablePath: await chromium.executablePath(),
+    headless: true
   });
-  
-  const rendered = resvg.render();
-  console.log(`chart-poster PNG: ${rendered.width}x${rendered.height}, ${rendered.asPng().length} bytes`);
-  return {
-    png: rendered.asPng(),
-    width: rendered.width,
-    height: rendered.height,
-    svgLength: svg.length
-  };
+
+  try {
+    const context = await browser.newContext({
+      viewport: { width: CANVAS_WIDTH, height: CANVAS_HEIGHT },
+      deviceScaleFactor: 1,
+      javaScriptEnabled: false
+    });
+    const page = await context.newPage();
+    await page.setContent(html, { waitUntil: 'domcontentloaded' });
+    const png = await page.screenshot({ type: 'png' });
+    await context.close();
+
+    console.log(`chart-poster PNG: ${CANVAS_WIDTH}x${CANVAS_HEIGHT}, ${png.length} bytes`);
+    return {
+      png,
+      width: CANVAS_WIDTH,
+      height: CANVAS_HEIGHT,
+      svgLength: svg.length
+    };
+  } finally {
+    await browser.close();
+  }
 }
 
 module.exports = {
