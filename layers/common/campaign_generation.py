@@ -270,23 +270,29 @@ RADIO_READS_SCHEMA = {
 }
 
 INFOGRAPHIC_SCHEMA = {
-    'headline': 'string',
-    'subhead': 'string',
-    'chart_story': 'string',
-    'movement_summary': 'string',
-    'statistics': [{'label': 'string', 'value': 'number or string'}],
+    'headline': 'string (one-line week summary, reusable in socials)',
+    'chart_story': 'string (2-3 sentence narrative of the week)',
+    'movement_summary': 'string (one-line movement overview)',
+    'chart_talk': [
+        {
+            'icon': 'Font Awesome class name (e.g. fa-trophy, fa-rocket, fa-star)',
+            'headline': 'string (5-15 words, ALL CAPS, max 25 characters)',
+            'body': 'string (1-2 sentences, max 90 characters)'
+        }
+    ],
     'track_cards': [
         {
             'rank': 'number',
             'display_text': 'Artist - Title',
             'movement_badge': 'string',
-            'supporting_line': 'string'
+            'supporting_line': 'string (editorial note about this track)'
         }
     ],
-    'promotional_footer': 'string',
     'self_review': {
         'facts_verified': True,
-        'ready_for_publication': True,
+        'chart_talk_count': 6,
+        'all_headlines_under_25_chars': True,
+        'all_bodies_under_90_chars': True,
         'missing_inputs': []
     }
 }

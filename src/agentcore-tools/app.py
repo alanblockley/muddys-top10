@@ -328,7 +328,8 @@ def render_infographic_png(campaign, chart_brief=None):
             'time': '2AM SLT',
             'day': 'EVERY SATURDAY',
             'presenters': 'DJ TOOHEY & JP'
-        }
+        },
+        'chart_talk': infographic.get('chart_talk') or []
     }
 
     response = lambda_client.invoke(

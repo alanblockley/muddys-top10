@@ -42,6 +42,24 @@ function buildPosterHtml(data) {
 <head>
 <meta charset="utf-8">
 <style>
+@font-face { font-family: 'Font Awesome 6 Free'; font-style: normal; font-weight: 900; src: url('assets/fontawesome/webfonts/fa-solid-900.woff2') format('woff2'); }
+.fa-solid, .fas { font-family: 'Font Awesome 6 Free'; font-weight: 900; font-style: normal; -webkit-font-smoothing: antialiased; }
+.fa-trophy:before { content: "\\f091"; }
+.fa-rocket:before { content: "\\f135"; }
+.fa-star:before { content: "\\f005"; }
+.fa-music:before { content: "\\f001"; }
+.fa-fire:before { content: "\\f06d"; }
+.fa-arrow-up:before { content: "\\f062"; }
+.fa-arrow-down:before { content: "\\f063"; }
+.fa-chart-line:before { content: "\\f201"; }
+.fa-rotate-left:before { content: "\\f2ea"; }
+.fa-equals:before { content: "\\f52c"; }
+.fa-bolt:before { content: "\\f0e7"; }
+.fa-crown:before { content: "\\f521"; }
+.fa-users:before { content: "\\f0c0"; }
+.fa-clock:before { content: "\\f017"; }
+.fa-hashtag:before { content: "\\23"; }
+
 * { margin: 0; padding: 0; box-sizing: border-box; }
 html, body {
   width: ${CANVAS_WIDTH}px;
@@ -275,15 +293,24 @@ html, body {
   border-bottom: none;
 }
 .chart-talk-cell .cell-icon {
-  font-size: 28px;
+  font-size: 24px;
   line-height: 1;
   flex-shrink: 0;
+  color: #facc15;
+  text-shadow: 0 0 6px rgba(250,204,21,0.4);
+  width: 30px;
+  text-align: center;
 }
 .chart-talk-cell .cell-text {
   font-size: 16px;
   line-height: 1.3;
   color: #e2e8f0;
   font-family: Arial, Helvetica, sans-serif;
+}
+.chart-talk-cell .cell-text strong {
+  color: #facc15;
+  font-size: 13px;
+  letter-spacing: 0.03em;
 }
 .stats-strip {
   display: grid;
@@ -487,59 +514,60 @@ function escapeHtml(str) {
 }
 
 function buildChartTalkCells(data) {
+  // Use Claude-generated chart_talk if available
+  const chartTalk = data.chart_talk || [];
+  if (chartTalk.length >= 6) {
+    return chartTalk.slice(0, 6).map(cell => 
+      `<div class="chart-talk-cell"><span class="cell-icon"><i class="fa-solid ${escapeHtml(cell.icon || 'fa-music')}"></i></span><span class="cell-text"><strong>${escapeHtml(cell.headline || '')}</strong><br>${escapeHtml(cell.body || '')}</span></div>`
+    ).join('\n');
+  }
+
+  // Fallback: auto-generate from chart data
   const tracks = data.tracks || [];
   const cells = [];
 
-  // Cell 1: Number one story
   const top = tracks[0];
   if (top) {
-    if (top.movement === 'up') cells.push({ icon: '🏆', text: `${top.artist} takes #1, climbing ${top.delta} places this week` });
-    else if (top.movement === 'new') cells.push({ icon: '🏆', text: `${top.artist} debuts straight in at #1` });
-    else cells.push({ icon: '🏆', text: `${top.artist} holds the #1 spot for another week` });
+    if (top.movement === 'up') cells.push({ icon: 'fa-trophy', headline: `TAKES #1!`, body: `${top.artist} climbs ${top.delta} places to claim the top spot` });
+    else if (top.movement === 'new') cells.push({ icon: 'fa-trophy', headline: 'STRAIGHT IN AT #1!', body: `${top.artist} debuts at the top of the chart` });
+    else cells.push({ icon: 'fa-trophy', headline: 'HOLDS THE CROWN!', body: `${top.artist} keeps the #1 spot for another week` });
   }
 
-  // Cell 2: Biggest climber
   const climbers = tracks.filter(t => t.movement === 'up' && t.delta);
   if (climbers.length) {
     const biggest = climbers.reduce((a, b) => (b.delta > a.delta ? b : a));
-    cells.push({ icon: '🚀', text: `${biggest.artist} rockets up ${biggest.delta} places to #${biggest.rank}` });
+    cells.push({ icon: 'fa-rocket', headline: `UP ${biggest.delta} PLACES!`, body: `${biggest.artist} rockets to #${biggest.rank}` });
   }
 
-  // Cell 3: New entry
   const newEntries = tracks.filter(t => t.movement === 'new');
   if (newEntries.length) {
-    cells.push({ icon: '⭐', text: `${newEntries[0].artist} is a brand new entry at #${newEntries[0].rank}` });
+    cells.push({ icon: 'fa-star', headline: 'NEW ENTRY!', body: `${newEntries[0].artist} arrives at #${newEntries[0].rank}` });
   }
 
-  // Cell 4: Re-entry
   const reentries = tracks.filter(t => t.movement === 'reentry');
   if (reentries.length) {
-    cells.push({ icon: '🎵', text: `${reentries[0].artist} returns to the chart at #${reentries[0].rank}` });
+    cells.push({ icon: 'fa-rotate-left', headline: 'WELCOME BACK!', body: `${reentries[0].artist} returns at #${reentries[0].rank}` });
   } else {
-    // Filler: biggest faller
     const fallers = tracks.filter(t => t.movement === 'down' && t.delta);
     if (fallers.length) {
       const biggest = fallers.reduce((a, b) => (Math.abs(b.delta) > Math.abs(a.delta) ? b : a));
-      cells.push({ icon: '🎵', text: `${biggest.artist} drops ${Math.abs(biggest.delta)} to #${biggest.rank}` });
+      cells.push({ icon: 'fa-arrow-down', headline: 'GIVES UP GROUND', body: `${biggest.artist} drops ${Math.abs(biggest.delta)} to #${biggest.rank}` });
     }
   }
 
-  // Cell 5: Non-mover / holding
   const holds = tracks.filter(t => t.movement === 'same');
   if (holds.length) {
-    cells.push({ icon: '🎶', text: `${holds[0].artist} holds steady at #${holds[0].rank}` });
+    cells.push({ icon: 'fa-equals', headline: 'HOLDS STEADY!', body: `${holds[0].artist} stays put at #${holds[0].rank}` });
   }
 
-  // Cell 6: Chart story / headline
-  cells.push({ icon: '💬', text: data.headline || data.chart_story || 'Another week of great music at Muddy\'s' });
+  cells.push({ icon: 'fa-chart-line', headline: 'THIS WEEK', body: data.headline || data.chart_story || 'Another week of great music' });
 
-  // Ensure exactly 6 cells
   while (cells.length < 6) {
-    cells.push({ icon: '♪', text: 'Your requests shape the chart every week' });
+    cells.push({ icon: 'fa-music', headline: 'YOUR CHART', body: 'Shaped by your requests every week' });
   }
 
   return cells.slice(0, 6).map(cell => 
-    `<div class="chart-talk-cell"><span class="cell-icon">${cell.icon}</span><span class="cell-text">${escapeHtml(cell.text)}</span></div>`
+    `<div class="chart-talk-cell"><span class="cell-icon"><i class="fa-solid ${escapeHtml(cell.icon)}"></i></span><span class="cell-text"><strong>${escapeHtml(cell.headline)}</strong><br>${escapeHtml(cell.body)}</span></div>`
   ).join('\n');
 }
 
