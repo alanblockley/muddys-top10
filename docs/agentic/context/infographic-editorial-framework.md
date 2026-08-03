@@ -77,6 +77,8 @@ The AI generates these 6 cells each week by selecting from the editorial categor
 4. Prefer stories that explain what listeners CAN'T see from the chart alone
 5. If the chart is stable (few movements), lean into longevity and momentum stories
 6. If the chart is volatile, lean into movement and new entries
+7. **No artist may appear in more than one Chart Talk cell** — each cell must feature a different artist or topic
+8. All 6 cells must contain genuine editorial content — never use filler like the chart name or tagline
 
 ## Tone Rules
 

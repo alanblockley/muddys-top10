@@ -466,10 +466,12 @@ html, body {
       </div>
       <div class="stats-strip">
         <div class="stats-strip-panel">
-          <div class="panel-title">&nbsp;</div>
+          <div class="panel-title">Headline</div>
+          <div class="panel-row" style="font-weight:700;color:#facc15;">${escapeHtml(data.headline || '')}</div>
         </div>
         <div class="stats-strip-panel">
-          <div class="panel-title">&nbsp;</div>
+          <div class="panel-title">Chart Story</div>
+          <div class="panel-row">${escapeHtml(data.chart_story || '')}</div>
         </div>
         <div class="stats-strip-panel">
           <div class="panel-title">This Week's Stats</div>
@@ -522,48 +524,77 @@ function buildChartTalkCells(data) {
     ).join('\n');
   }
 
-  // Fallback: auto-generate from chart data
+  // Fallback: auto-generate from chart data (no duplicate artists, no filler)
   const tracks = data.tracks || [];
   const cells = [];
+  const usedArtists = new Set();
 
+  function addCell(icon, headline, body, artist) {
+    if (artist && usedArtists.has(artist)) return false;
+    if (artist) usedArtists.add(artist);
+    cells.push({ icon, headline, body });
+    return true;
+  }
+
+  // 1. Chart leader
   const top = tracks[0];
   if (top) {
-    if (top.movement === 'up') cells.push({ icon: 'fa-trophy', headline: `TAKES #1!`, body: `${top.artist} climbs ${top.delta} places to claim the top spot` });
-    else if (top.movement === 'new') cells.push({ icon: 'fa-trophy', headline: 'STRAIGHT IN AT #1!', body: `${top.artist} debuts at the top of the chart` });
-    else cells.push({ icon: 'fa-trophy', headline: 'HOLDS THE CROWN!', body: `${top.artist} keeps the #1 spot for another week` });
+    if (top.movement === 'up') addCell('fa-trophy', 'TAKES #1!', `${top.artist} climbs ${top.delta} places to claim the top spot`, top.artist);
+    else if (top.movement === 'new') addCell('fa-trophy', 'STRAIGHT IN AT #1!', `${top.artist} debuts at the top of the chart`, top.artist);
+    else addCell('fa-trophy', 'HOLDS THE CROWN!', `${top.artist} keeps the #1 spot for another week`, top.artist);
   }
 
-  const climbers = tracks.filter(t => t.movement === 'up' && t.delta);
+  // 2. Biggest climber (not #1 artist)
+  const climbers = tracks.filter(t => t.movement === 'up' && t.delta && !usedArtists.has(t.artist));
   if (climbers.length) {
     const biggest = climbers.reduce((a, b) => (b.delta > a.delta ? b : a));
-    cells.push({ icon: 'fa-rocket', headline: `UP ${biggest.delta} PLACES!`, body: `${biggest.artist} rockets to #${biggest.rank}` });
+    addCell('fa-rocket', `UP ${biggest.delta} PLACES!`, `${biggest.artist} rockets to #${biggest.rank}`, biggest.artist);
   }
 
-  const newEntries = tracks.filter(t => t.movement === 'new');
+  // 3. New entry
+  const newEntries = tracks.filter(t => t.movement === 'new' && !usedArtists.has(t.artist));
   if (newEntries.length) {
-    cells.push({ icon: 'fa-star', headline: 'NEW ENTRY!', body: `${newEntries[0].artist} arrives at #${newEntries[0].rank}` });
+    addCell('fa-star', 'NEW ENTRY!', `${newEntries[0].artist} arrives at #${newEntries[0].rank}`, newEntries[0].artist);
   }
 
-  const reentries = tracks.filter(t => t.movement === 'reentry');
+  // 4. Re-entry
+  const reentries = tracks.filter(t => t.movement === 'reentry' && !usedArtists.has(t.artist));
   if (reentries.length) {
-    cells.push({ icon: 'fa-rotate-left', headline: 'WELCOME BACK!', body: `${reentries[0].artist} returns at #${reentries[0].rank}` });
-  } else {
-    const fallers = tracks.filter(t => t.movement === 'down' && t.delta);
-    if (fallers.length) {
-      const biggest = fallers.reduce((a, b) => (Math.abs(b.delta) > Math.abs(a.delta) ? b : a));
-      cells.push({ icon: 'fa-arrow-down', headline: 'GIVES UP GROUND', body: `${biggest.artist} drops ${Math.abs(biggest.delta)} to #${biggest.rank}` });
+    addCell('fa-rotate-left', 'WELCOME BACK!', `${reentries[0].artist} returns at #${reentries[0].rank}`, reentries[0].artist);
+  }
+
+  // 5. Biggest faller
+  const fallers = tracks.filter(t => t.movement === 'down' && t.delta && !usedArtists.has(t.artist));
+  if (fallers.length) {
+    const biggest = fallers.reduce((a, b) => (Math.abs(b.delta) > Math.abs(a.delta) ? b : a));
+    addCell('fa-arrow-down', 'GIVES UP GROUND', `${biggest.artist} drops ${Math.abs(biggest.delta)} to #${biggest.rank}`, biggest.artist);
+  }
+
+  // 6. Non-mover
+  const holds = tracks.filter(t => t.movement === 'same' && !usedArtists.has(t.artist));
+  if (holds.length) {
+    addCell('fa-equals', 'HOLDS STEADY!', `${holds[0].artist} stays put at #${holds[0].rank}`, holds[0].artist);
+  }
+
+  // 7. Second climber if we still need cells
+  if (cells.length < 6) {
+    const moreClimbers = tracks.filter(t => t.movement === 'up' && t.delta && !usedArtists.has(t.artist));
+    if (moreClimbers.length) {
+      const next = moreClimbers[0];
+      addCell('fa-arrow-up', 'ON THE RISE!', `${next.artist} climbs ${next.delta} to #${next.rank}`, next.artist);
     }
   }
 
-  const holds = tracks.filter(t => t.movement === 'same');
-  if (holds.length) {
-    cells.push({ icon: 'fa-equals', headline: 'HOLDS STEADY!', body: `${holds[0].artist} stays put at #${holds[0].rank}` });
+  // 8. Total plays stat
+  if (cells.length < 6) {
+    const totalPlays = tracks.reduce((sum, t) => sum + (t.plays || 0), 0);
+    addCell('fa-chart-line', `${totalPlays} PLAYS!`, `Total plays counted across the Top 10 this week`, null);
   }
 
-  cells.push({ icon: 'fa-chart-line', headline: 'THIS WEEK', body: data.headline || data.chart_story || 'Another week of great music' });
-
-  while (cells.length < 6) {
-    cells.push({ icon: 'fa-music', headline: 'YOUR CHART', body: 'Shaped by your requests every week' });
+  // 9. Movement summary
+  if (cells.length < 6) {
+    const stats = data.stats || {};
+    addCell('fa-bolt', 'CHART SHAKEUP!', `${stats.climbers || 0} climbers, ${stats.fallers || 0} fallers, ${stats.new_entries || 0} new`, null);
   }
 
   return cells.slice(0, 6).map(cell => 
