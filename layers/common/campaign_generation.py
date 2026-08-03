@@ -1078,16 +1078,6 @@ def create_campaign_draft(chart_brief, sections=None, venue_config=None, infogra
                 venue_config,
                 infographic_template
             )
-        draft['infographic_asset_validation'] = validate_infographic_asset(
-            draft['infographic_asset'],
-            chart_brief
-        )
-        if not draft['infographic_asset_validation']['valid']:
-            draft['status'] = 'failed'
-            draft['failure'] = {
-                'reason': 'invalid_infographic_asset',
-                'errors': draft['infographic_asset_validation']['errors']
-            }
     if 'social' in sections:
         if model_client and agent_specs.get('social'):
             draft['social'] = generate_social_posts_with_model(
