@@ -42,7 +42,7 @@ function buildPosterHtml(data) {
 <head>
 <meta charset="utf-8">
 <style>
-@font-face { font-family: 'Font Awesome 6 Free'; font-style: normal; font-weight: 900; src: url('assets/fontawesome/webfonts/fa-solid-900.woff2') format('woff2'); }
+@font-face { font-family: 'Font Awesome 6 Free'; font-style: normal; font-weight: 900; src: url('${data.fa_font_url || 'assets/fontawesome/webfonts/fa-solid-900.woff2'}') format('woff2'); }
 .fa-solid, .fas { font-family: 'Font Awesome 6 Free'; font-weight: 900; font-style: normal; -webkit-font-smoothing: antialiased; }
 .fa-trophy:before { content: "\\f091"; }
 .fa-rocket:before { content: "\\f135"; }
@@ -655,9 +655,11 @@ async function renderToPng(data, options = {}) {
 
   const logoPath = join(__dirname, 'assets', 'muddys-logo.png');
   const bgPath = join(__dirname, 'assets', 'background.png');
+  const faFontPath = join(__dirname, 'assets', 'fontawesome', 'webfonts', 'fa-solid-900.woff2');
 
   let logoDataUri = data.logo_url || 'assets/muddys-logo.png';
   let bgDataUri = 'assets/background.png';
+  let faFontDataUri = 'assets/fontawesome/webfonts/fa-solid-900.woff2';
 
   try {
     const logoBuffer = readFileSync(logoPath);
@@ -673,7 +675,14 @@ async function renderToPng(data, options = {}) {
     console.warn('chart-poster: Could not read background file, using fallback path');
   }
 
-  const renderData = { ...data, logo_url: logoDataUri, background_url: bgDataUri };
+  try {
+    const faBuffer = readFileSync(faFontPath);
+    faFontDataUri = `data:font/woff2;base64,${faBuffer.toString('base64')}`;
+  } catch (e) {
+    console.warn('chart-poster: Could not read FA font file, using fallback path');
+  }
+
+  const renderData = { ...data, logo_url: logoDataUri, background_url: bgDataUri, fa_font_url: faFontDataUri };
   const html = buildPosterHtml(renderData);
 
   const chromium = require('@sparticuz/chromium');
