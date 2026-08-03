@@ -1,16 +1,23 @@
 /**
- * Test the chart poster rendering with sample data.
+ * Test the chart poster locally.
+ * 
+ * Usage:
+ *   node test-poster.js
+ * 
+ * Outputs:
+ *   test-poster.html — open in browser to preview the design
+ *   test-poster.png  — rendered PNG (only works if Playwright/Chromium available)
  */
-const { renderToPng, renderToSvg, buildChartPosterSyntax } = require('./chart-poster');
+const { buildPosterHtml, renderToPng } = require('./chart-poster');
 const { writeFileSync } = require('node:fs');
-const { join } = require('node:path');
 
 const SAMPLE_DATA = {
-  chart_title: "Muddy's Top 10",
+  chart_title: "Top 10",
   tagline: "Your requests. Your music. Your chart.",
   week_display: "JUL 25 – AUG 1, 2026",
+  week_id: "2026-07-25",
   headline: "New number one as Olivia Dean takes the crown",
-  chart_story: "After three weeks climbing steadily, Olivia Dean finally reaches the summit. Bruno Mars drops two places after a dominant run.",
+  chart_story: "After three weeks climbing steadily, Olivia Dean finally reaches the summit with Man I Need. Bruno Mars drops two places after a dominant three-week run at the top.",
   tracks: [
     { rank: 1, artist: "Olivia Dean", title: "Man I Need", plays: 33, movement: "up", delta: 3 },
     { rank: 2, artist: "Alex Warren", title: "FEVER DREAM", plays: 30, movement: "up", delta: 1 },
@@ -30,23 +37,21 @@ const SAMPLE_DATA = {
 async function main() {
   console.log('=== Chart Poster Test ===\n');
 
-  // Show the syntax
-  const syntax = buildChartPosterSyntax(SAMPLE_DATA);
-  console.log('Generated syntax:');
-  console.log(syntax);
-  console.log('---\n');
+  // Always output HTML (works without Playwright)
+  const html = buildPosterHtml(SAMPLE_DATA);
+  writeFileSync('test-poster.html', html);
+  console.log(`HTML: ${html.length} chars → test-poster.html`);
+  console.log('Open test-poster.html in your browser to preview the design.\n');
 
-  // Render to SVG
-  console.log('Rendering SVG...');
-  const svg = await renderToSvg(SAMPLE_DATA);
-  writeFileSync(join(__dirname, 'test-poster.svg'), svg);
-  console.log(`SVG: ${svg.length} chars → test-poster.svg`);
-
-  // Render to PNG
-  console.log('Rendering PNG...');
-  const result = await renderToPng(SAMPLE_DATA);
-  writeFileSync(join(__dirname, 'test-poster.png'), result.png);
-  console.log(`PNG: ${result.png.length} bytes, ${result.width}x${result.height} → test-poster.png`);
+  // Try PNG rendering (needs Playwright + Chromium)
+  try {
+    const result = await renderToPng(SAMPLE_DATA);
+    writeFileSync('test-poster.png', result.png);
+    console.log(`PNG: ${result.png.length} bytes, ${result.width}x${result.height} → test-poster.png`);
+  } catch (err) {
+    console.log(`PNG rendering skipped (Playwright not available locally): ${err.message}`);
+    console.log('The HTML preview is sufficient for design iteration.');
+  }
 
   console.log('\n=== Done ===');
 }
