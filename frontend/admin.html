@@ -3414,59 +3414,25 @@
         function renderInfographicAssetPanel(campaign, options = {}) {
             const showTools = options.showTools !== false;
             const hasPng = campaign.infographic_png && campaign.infographic_png.url;
-            const hasAsset = campaign.infographic_asset && campaign.infographic_asset.html;
 
-            if (!hasPng && !hasAsset) {
-                const chartTracks = ((campaign.chart_brief || {}).tracks || []).slice(0, 10);
-                if (chartTracks.length < 10) {
-                    return `
-                        <div class="preview-block">
-                            <h4>Infographic</h4>
-                            <p style="color: #94a3b8;">Needs 10 chart rows before an infographic can be generated.</p>
-                        </div>
-                    `;
-                }
+            if (!hasPng) {
                 return `
                     <div class="preview-block">
                         <h4>Infographic</h4>
-                        <p style="color: #94a3b8;">No infographic has been generated for this campaign yet.</p>
+                        <p style="color: #94a3b8;">No infographic PNG has been generated for this campaign yet.</p>
                     </div>
                 `;
             }
 
-            // Build tabs
-            const pngTab = hasPng ? `<button class="infographic-tab active" onclick="switchInfographicTab(event, 'png')">PNG Output</button>` : '';
-            const htmlTab = hasAsset ? `<button class="infographic-tab${!hasPng ? ' active' : ''}" onclick="switchInfographicTab(event, 'html')">HTML Render</button>` : '';
-
-            const pngDownloadUrl = hasPng ? (campaign.infographic_png.download_url || campaign.infographic_png.url) : '';
-            const pngPanel = hasPng ? `
-                <div class="infographic-tab-panel${hasPng ? ' active' : ''}" id="infographicTabPng">
-                    ${showTools ? `<div class="infographic-tools">
-                        <a href="${escapeHtml(pngDownloadUrl)}" class="btn" download>Download PNG</a>
-                        <button onclick="copyInfographicInput()" class="btn btn-secondary">Copy Source JSON</button>
-                    </div>
-                    ${renderAssetFeedbackControls('infographic', 'infographic PNG')}` : ''}
-                    <img class="campaign-png-preview" src="${escapeHtml(campaign.infographic_png.url)}" alt="Generated Muddy's Top 10 infographic for week ${escapeHtml(campaign.week_id || '')}">
-                </div>
-            ` : '';
-
-            const htmlPanel = hasAsset ? `
-                <div class="infographic-tab-panel${!hasPng ? ' active' : ''}" id="infographicTabHtml">
-                    ${showTools ? `<div class="infographic-tools">
-                        <button onclick="downloadStoredInfographicPng()" class="btn">Download as PNG</button>
-                        <button onclick="copyInfographicInput()" class="btn btn-secondary">Copy Asset JSON</button>
-                    </div>` : ''}
-                    <iframe id="storedInfographicFrame" class="campaign-asset-frame" sandbox srcdoc="${escapeHtml(storedInfographicDocument(campaign.infographic_asset))}"></iframe>
-                </div>
-            ` : '';
-
+            const pngDownloadUrl = campaign.infographic_png.download_url || campaign.infographic_png.url;
             return `
                 <div class="preview-block">
                     <h4>Infographic</h4>
-                    <div class="infographic-tabs">
-                        ${pngTab}${htmlTab}
+                    ${showTools ? `<div class="infographic-tools">
+                        <a href="${escapeHtml(pngDownloadUrl)}" class="btn" download>Download PNG</a>
                     </div>
-                    ${pngPanel}${htmlPanel}
+                    ${renderAssetFeedbackControls('infographic', 'infographic PNG')}` : ''}
+                    <img class="campaign-png-preview" src="${escapeHtml(campaign.infographic_png.url)}" alt="Generated Muddy's Top 10 infographic for week ${escapeHtml(campaign.week_id || '')}">
                 </div>
             `;
         }
