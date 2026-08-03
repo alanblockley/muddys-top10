@@ -56,7 +56,7 @@ html, body {
   height: ${CANVAS_HEIGHT}px;
   display: grid;
   grid-template-rows: 140px 1fr 100px;
-  background: url('assets/background.png') center/cover no-repeat;
+  background: url('${data.background_url || 'assets/background.png'}') center/cover no-repeat;
   padding: 16px 24px 18px 24px;
   position: relative;
 }
@@ -571,7 +571,32 @@ async function renderToPng(data, options = {}) {
     console.warn('chart-poster: No tracks in data! PNG will be empty.');
   }
 
-  const html = buildPosterHtml(data);
+  // Resolve images as data URIs for Lambda (relative paths won't work in /var/task)
+  const { readFileSync } = require('node:fs');
+  const { join } = require('node:path');
+
+  const logoPath = join(__dirname, 'assets', 'muddys-logo.png');
+  const bgPath = join(__dirname, 'assets', 'background.png');
+
+  let logoDataUri = data.logo_url || 'assets/muddys-logo.png';
+  let bgDataUri = 'assets/background.png';
+
+  try {
+    const logoBuffer = readFileSync(logoPath);
+    logoDataUri = `data:image/png;base64,${logoBuffer.toString('base64')}`;
+  } catch (e) {
+    console.warn('chart-poster: Could not read logo file, using fallback path');
+  }
+
+  try {
+    const bgBuffer = readFileSync(bgPath);
+    bgDataUri = `data:image/png;base64,${bgBuffer.toString('base64')}`;
+  } catch (e) {
+    console.warn('chart-poster: Could not read background file, using fallback path');
+  }
+
+  const renderData = { ...data, logo_url: logoDataUri, background_url: bgDataUri };
+  const html = buildPosterHtml(renderData);
 
   const chromium = require('@sparticuz/chromium');
   const { chromium: playwrightChromium } = require('playwright-core');
@@ -598,7 +623,8 @@ async function renderToPng(data, options = {}) {
       png,
       width: CANVAS_WIDTH,
       height: CANVAS_HEIGHT,
-      htmlLength: html.length
+      htmlLength: html.length,
+      html
     };
   } finally {
     await browser.close();

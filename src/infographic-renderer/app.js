@@ -64,6 +64,12 @@ async function renderChartPoster(event, bucket) {
       size_bytes: result.png.length,
       generated_at: generatedAt,
       renderer: "antv-infographic"
+    },
+    infographic_asset: {
+      html: result.html || '',
+      css: '',
+      canvas: { width: CANVAS_WIDTH, height: CANVAS_HEIGHT },
+      metadata: { renderer: "chart-poster-template", generated_at: generatedAt }
     }
   };
 }

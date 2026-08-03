@@ -238,7 +238,10 @@ def create_chart_campaign(args):
                 if security_errors:
                     raise RuntimeError(f"Infographic asset validation failed: {', '.join(security_errors)}")
             set_progress(progress_week_id, 'rendering_infographic_png', 'Rendering the final infographic PNG.')
-            campaign['infographic_png'] = render_infographic_png(campaign, chart_brief=chart_brief)
+            render_result = render_infographic_png(campaign, chart_brief=chart_brief)
+            campaign['infographic_png'] = render_result['infographic_png']
+            if render_result.get('infographic_asset'):
+                campaign['infographic_asset'] = render_result['infographic_asset']
         set_progress(progress_week_id, 'saving_campaign', 'Saving generated campaign assets and metadata.')
         campaign['campaign_progress'] = {
             'stage': 'complete',
@@ -367,7 +370,10 @@ def render_infographic_png(campaign, chart_brief=None):
         raise RuntimeError(result.get('error') or 'Infographic renderer did not return ok')
     if not result.get('infographic_png'):
         raise RuntimeError('Infographic renderer did not return infographic_png metadata')
-    return result['infographic_png']
+    return {
+        'infographic_png': result['infographic_png'],
+        'infographic_asset': result.get('infographic_asset')
+    }
 
 
 def render_model_infographic_png(campaign):
