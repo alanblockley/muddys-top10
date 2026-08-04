@@ -1,388 +1,207 @@
-# Architecture Overview
+# System Architecture
 
-## System Diagram
+Serverless AWS application that monitors a Shoutcast internet radio stream, tracks played songs, validates against MusicBrainz/Spotify, computes weekly Top 10 charts, and generates AI-powered marketing campaigns (infographic PNG, social posts, radio reads).
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                         AWS Cloud                               │
-│                                                                 │
-│  ┌──────────────┐         ┌─────────────────┐                 │
-│  │ EventBridge  │         │  Stream Poller  │                 │
-│  │   Rule       │────────▶│     Lambda      │                 │
-│  │ (every 1min) │         │                 │                 │
-│  └──────────────┘         └────────┬────────┘                 │
-│                                    │                           │
-│                                    │ Write                     │
-│                                    ▼                           │
-│                           ┌─────────────────┐                 │
-│                           │   DynamoDB      │                 │
-│                           │  Tracks Table   │                 │
-│  ┌──────────────┐         │                 │                 │
-│  │ API Gateway  │         │  Config Table   │                 │
-│  │              │         └─────────────────┘                 │
-│  │  GET  /      │                  ▲                           │
-│  │  GET  /api/* │                  │ Read/Write               │
-│  │  PUT  /api/* │                  │                           │
-│  └──────┬───────┘         ┌────────┴────────┐                 │
-│         │                 │   API Handler   │                 │
-│         └────────────────▶│     Lambda      │                 │
-│                           │                 │                 │
-│                           │  - History      │                 │
-│                           │  - Top 10       │                 │
-│                           │  - Config       │                 │
-│                           │  - Frontend     │                 │
-│                           └─────────────────┘                 │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
-                                    ▲
-                                    │ HTTP GET
-                                    │
-                         ┌──────────┴──────────┐
-                         │  Shoutcast Stream   │
-                         │  muddys.digistream  │
-                         └─────────────────────┘
-                                    ▲
-                                    │ Listen
-                                    │
-                              ┌─────┴─────┐
-                              │   Users   │
-                              │  Browser  │
-                              └───────────┘
-```
-
-## Data Flow
-
-### 1. Track Polling Flow
+## Architecture Diagram
 
 ```
-EventBridge (1 min) → Poller Lambda → HTTP GET Stream
-                                    ↓
-                            Parse current track
-                                    ↓
-                        Compare with last track
-                                    ↓
-                    If changed → DynamoDB Tracks Table
-                    If same → Skip
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  Shoutcast Stream                                                               │
+│  (muddys.digistream.info:20398)                                                 │
+└──────────────────────────────────┬──────────────────────────────────────────────┘
+                                   │ HTTP poll every 1min
+                                   ▼
+┌──────────────────────────────────────────────────────────────────────────────────┐
+│  EventBridge Schedules                                                           │
+│  ├── Stream poll (1min)                                                          │
+│  ├── Chart snapshot (weekly, configurable)                                       │
+│  └── Campaign generation (weekly, after chart)                                   │
+└───────┬──────────────────────────────┬───────────────────────────┬───────────────┘
+        │                              │                           │
+        ▼                              ▼                           ▼
+┌───────────────────┐  ┌──────────────────────────┐  ┌─────────────────────────────┐
+│ StreamPoller      │  │ PlaylistGenerator        │  │ CampaignGenerator           │
+│ Function          │  │ Function                 │  │ Function                    │
+│ (Python 3.14)     │  │ (Python 3.14)            │  │ (Python 3.14)               │
+└────────┬──────────┘  └────────────┬─────────────┘  └──────────────┬──────────────┘
+         │                          │                                │
+         ▼                          ▼                                ▼
+┌──────────────────────────────────────────────┐    ┌───────────────────────────────┐
+│  DynamoDB                                    │    │  AgentCore Runtime            │
+│  ├── Tracks Table (stream: NEW_IMAGE)        │    │  (Strands Agent)              │
+│  ├── Config Table                            │    └───────────────┬───────────────┘
+│  ├── ChartHistory Table                      │                    │
+│  └── ChartCampaigns Table                    │                    ▼
+└───────────┬──────────────────────────────────┘    ┌───────────────────────────────┐
+            │ DynamoDB Stream                        │  AgentCore Gateway            │
+            ▼                                       └───────────────┬───────────────┘
+┌───────────────────────┐                                           │
+│ TrackValidator        │                                           ▼
+│ Function              │                           ┌───────────────────────────────┐
+│ (Python 3.14)         │                           │  AgentCoreTools Function      │
+└───────┬───────┬───────┘                           │  (Python 3.14)                │
+        │       │                                   │  MCP tool surface             │
+        ▼       ▼                                   └───────┬───────────────┬───────┘
+┌────────────┐ ┌────────────┐                               │               │
+│MusicBrainz│ │ Spotify    │                               ▼               ▼
+│ API        │ │ API        │               ┌──────────────────┐  ┌─────────────────┐
+└────────────┘ └────────────┘               │ Bedrock          │  │ Infographic     │
+                                            │ (Claude Sonnet   │  │ Renderer        │
+                                            │  4.6)            │  │ (Node.js 20.x)  │
+┌───────────────────────────────────────┐   └──────────────────┘  └────────┬────────┘
+│  API Gateway + Cognito                │                                  │
+│  (REST API, 26+ routes)              │                                  ▼
+└───────────────┬───────────────────────┘                       ┌─────────────────┐
+                │                                               │ S3 Bucket       │
+                ▼                                               │ (PNG assets)    │
+┌───────────────────────────────────┐                           └─────────────────┘
+│  ApiFunction (Python 3.14)        │
+│  ├── /api/top10                   │
+│  ├── /api/top10/history           │
+│  ├── /api/campaigns               │
+│  ├── /api/history                 │
+│  ├── /api/config                  │
+│  └── /api/health                  │
+└───────────────────────────────────┘
+
+┌───────────────────────────────────────┐   ┌───────────────────────────────────┐
+│  S3 + CloudFront                      │   │  AgentCore Memory                 │
+│  (Static frontend, HTTPS)             │   │  (Feedback + editorial context)   │
+└───────────────────────────────────────┘   └───────────────────────────────────┘
+
+┌───────────────────────────────────┐
+│  ScheduleUpdater Function         │
+│  (Python 3.14)                    │
+│  Syncs EventBridge from config    │
+└───────────────────────────────────┘
 ```
-
-### 2. History Query Flow
-
-```
-User → API Gateway (/api/history) → API Lambda
-                                        ↓
-                    Query DynamoDB (last 7 days)
-                                        ↓
-                            Group by 2-hour blocks
-                                        ↓
-                                Return JSON
-```
-
-### 3. Top 10 Query Flow
-
-```
-User → API Gateway (/api/top10) → API Lambda
-                                      ↓
-                        Get config (chart time)
-                                      ↓
-                    Query current week tracks
-                                      ↓
-                    Query previous week tracks
-                                      ↓
-                        Count & rank tracks
-                                      ↓
-                    Calculate movement indicators
-                                      ↓
-                            Return JSON
-```
-
-## DynamoDB Access Patterns
-
-### Tracks Table
-
-**Pattern 1: Write new track**
-- Operation: `PutItem`
-- Key: `pk=TRACK, sk=TS#{timestamp}`
-- Used by: Poller Lambda
-
-**Pattern 2: Query recent tracks**
-- Operation: `Query` on timestamp-index
-- Key: `pk=TRACK, timestamp >= {7_days_ago}`
-- Used by: API Lambda (History)
-
-**Pattern 3: Query week range**
-- Operation: `Query` on timestamp-index
-- Key: `pk=TRACK, timestamp BETWEEN {week_start} AND {week_end}`
-- Used by: API Lambda (Top 10)
-
-### Chart History Table
-
-**Pattern 1: Upsert weekly Top 10 snapshot**
-- Operation: `PutItem`
-- Key: `pk=TOP10_HISTORY, sk=WEEK#{week_id}`
-- Used by: API Lambda (`GET /api/top10`) and Playlist Generator Lambda
-
-**Pattern 2: Query recent chart snapshots**
-- Operation: `Query`
-- Key: `pk=TOP10_HISTORY`, optionally `sk BETWEEN WEEK#{from} AND WEEK#{to}`
-- Used by: API Lambda (`GET /api/top10/history`) for index, range, paged, and full-detail reads
-
-**Pattern 3: Get one chart snapshot**
-- Operation: `GetItem`
-- Key: `pk=TOP10_HISTORY, sk=WEEK#{week_id}`
-- Used by: API Lambda (`GET /api/top10/history/{week_id}`)
-
-### Chart Campaigns Table
-
-**Pattern 1: Upsert generated campaign draft**
-- Operation: `PutItem`
-- Key: `pk=CAMPAIGN, sk=WEEK#{week_id}`
-- Used by: Campaign Generator Lambda and API Lambda (`POST /api/campaigns/generate`)
-
-**Pattern 2: Query campaign draft index**
-- Operation: `Query`
-- Key: `pk=CAMPAIGN`
-- Used by: API Lambda (`GET /api/campaigns`)
-
-**Pattern 3: Get or update campaign draft**
-- Operation: `GetItem` / `UpdateItem`
-- Key: `pk=CAMPAIGN, sk=WEEK#{week_id}`
-- Used by: API Lambda campaign review endpoints
-
-### Config Table
-
-**Pattern 1: Get config**
-- Operation: `GetItem`
-- Key: `configKey={key}`
-- Used by: API Lambda
-
-**Pattern 2: Update config**
-- Operation: `PutItem`
-- Key: `configKey={key}`
-- Used by: API Lambda
 
 ## Lambda Functions
 
-### Stream Poller
+| # | Function | Runtime | Trigger | Purpose |
+|---|----------|---------|---------|---------|
+| 1 | StreamPollerFunction | Python 3.14 | EventBridge (1min) | Polls Shoutcast stream, writes new tracks to DynamoDB |
+| 2 | TrackValidatorFunction | Python 3.14 | DynamoDB Streams (NEW_IMAGE) | Validates tracks against MusicBrainz/Spotify, canonicalizes names |
+| 3 | ApiFunction | Python 3.14 | API Gateway | REST API with Cognito auth, 26+ routes for chart/history/campaigns/config |
+| 4 | CampaignGeneratorFunction | Python 3.14 | EventBridge (weekly) / API | Invokes AgentCore Runtime to orchestrate campaign generation |
+| 5 | InfographicRendererFunction | Node.js 20.x | Lambda invoke | Renders HTML/CSS chart poster to 1280x720 PNG via Playwright |
+| 6 | PlaylistGeneratorFunction | Python 3.14 | EventBridge (weekly) | Generates Spotify playlist, persists weekly chart snapshot to ChartHistory |
+| 7 | ScheduleUpdaterFunction | Python 3.14 | Config change | Syncs EventBridge schedule rules when chart generation config changes |
+| 8 | AgentCoreToolsFunction | Python 3.14 | AgentCore Gateway | Lambda-backed MCP tools for chart/campaign operations |
 
-**Trigger:** EventBridge (rate: 1 minute)
-**Runtime:** Python 3.14
-**Memory:** 256 MB
-**Timeout:** 30 seconds
+## Infrastructure
 
-**Environment Variables:**
-- `TRACKS_TABLE`: DynamoDB table name
-- `CONFIG_TABLE`: DynamoDB table name
-- `STREAM_URL`: Shoutcast metadata URL
+### DynamoDB Tables
 
-**IAM Permissions:**
-- DynamoDB: PutItem on Tracks Table
-- DynamoDB: GetItem on Config Table
-- CloudWatch Logs: Write
+| Table | Primary Key | Purpose |
+|-------|-------------|---------|
+| Tracks | `pk=TRACK`, `sk=TS#{timestamp}` | Track play history with validation metadata. GSI on timestamp. Stream enabled (NEW_IMAGE). |
+| Config | `configKey` | Application configuration (chart schedule, filters, feature flags) |
+| ChartHistory | `pk=TOP10_HISTORY`, `sk=WEEK#{week_id}` | Persisted weekly Top 10 snapshots with movement data |
+| ChartCampaigns | `pk=CAMPAIGN`, `sk=WEEK#{week_id}` | Generated campaign drafts with revision history |
 
-### API Handler
+### Auth & Networking
 
-**Trigger:** API Gateway (HTTP API)
-**Runtime:** Python 3.14
-**Memory:** 256 MB
-**Timeout:** 30 seconds
+- **API Gateway**: REST API with Cognito authorizer
+- **Cognito User Pool**: JWT-based authentication for all API and frontend access
+- **CloudFront**: HTTPS CDN with OAC for S3 origin
+- **S3**: Static frontend hosting + campaign asset storage (infographic PNGs)
 
-**Endpoints:**
-- `GET /` - Serve frontend HTML
-- `GET /api/history` - Track history
-- `GET /api/top10` - Top 10 chart
-- `GET /api/top10/history` - Weekly Top 10 snapshot index
-- `GET /api/top10/history/{week_id}` - Weekly Top 10 snapshot detail
-- `GET /api/config` - Get configuration
-- `PUT /api/config` - Update configuration
-- `GET /api/campaigns` - Campaign draft index
-- `GET /api/campaigns/{week_id}` - Campaign draft detail
-- `POST /api/campaigns/generate` - Manual campaign generation/regeneration
-- `PUT /api/campaigns/{week_id}` - Edit campaign draft content
-- `PUT /api/campaigns/{week_id}/status` - Update campaign review status
+### AI & Agent Infrastructure
 
-**Environment Variables:**
-- `TRACKS_TABLE`: DynamoDB table name
-- `CONFIG_TABLE`: DynamoDB table name
-- `CHART_HISTORY_TABLE`: DynamoDB chart snapshot table name
-- `CAMPAIGNS_TABLE`: DynamoDB campaign draft table name
+- **AgentCore Runtime**: Strands Agent execution environment for campaign orchestration
+- **AgentCore Gateway**: IAM-authenticated MCP tool surface (no Cognito, no API Gateway)
+- **AgentCore Memory**: Semantic storage for feedback and editorial continuity
+- **Bedrock**: Claude Sonnet 4.6 via bedrock-runtime for text generation (radio reads, social posts, infographic copy)
 
-**IAM Permissions:**
-- DynamoDB: Query, GetItem on Tracks Table
-- DynamoDB: GetItem, PutItem on Config Table
-- DynamoDB: Query, GetItem, PutItem on Chart History Table
-- DynamoDB: Query, GetItem, PutItem, UpdateItem on Chart Campaigns Table
-- CloudWatch Logs: Write
+### Scheduling
 
-### Campaign Generator
+- **EventBridge**: Stream polling (1min), weekly chart snapshot, weekly campaign generation
+- **ScheduleUpdaterFunction**: Keeps EventBridge schedules in sync when config changes via admin UI
 
-**Trigger:** EventBridge Scheduler (`CampaignGenerationSchedule`) using `America/Los_Angeles`
-**Runtime:** Python 3.14
-**Memory:** 512 MB
-**Timeout:** 60 seconds
+## Campaign Generation Flow
 
-**Purpose:** Generate weekly campaign drafts outside Cognito user scope.
+```
+EventBridge (weekly)              API (manual trigger)
+        │                                │
+        └────────────┬───────────────────┘
+                     ▼
+        ┌─────────────────────────┐
+        │ CampaignGeneratorFunction│
+        └────────────┬────────────┘
+                     │ invoke
+                     ▼
+        ┌─────────────────────────┐
+        │ AgentCore Runtime       │
+        │ (Strands Agent)         │
+        └────────────┬────────────┘
+                     │ MCP tool calls
+                     ▼
+        ┌─────────────────────────┐
+        │ AgentCoreToolsFunction  │
+        │                         │
+        │ 1. get_chart_brief      │──→ ChartHistory table
+        │ 2. get_feedback         │──→ AgentCore Memory (semantic search)
+        │ 3. generate_editorial   │──→ Bedrock (Claude Sonnet 4.6)
+        │ 4. render_infographic   │──→ InfographicRendererFunction
+        │ 5. save_campaign        │──→ ChartCampaigns table
+        └─────────────────────────┘
+```
 
-This function snapshots the countable chart window first, then invokes
-AgentCore Runtime with a `create_chart_campaign` action for that explicit
-week. The countable window runs from chart reset to campaign generation; the
-freeze window between campaign generation and reset is retained in raw track
-history but excluded from Top 10 calculations to avoid show play-out bias.
+### Step Details
 
-**Environment Variables:**
-- `AGENTCORE_RUNTIME_ARN`: AgentCore Runtime ARN for campaign orchestration
-- `AGENTCORE_RUNTIME_QUALIFIER`: Runtime endpoint qualifier, normally `DEFAULT`
+1. **Chart Brief**: Builds deterministic facts from ChartHistory — rankings, movement, play counts, week-over-week deltas
+2. **Feedback Retrieval**: Queries AgentCore Memory for prior reviewer feedback via semantic search
+3. **Editorial Generation**: Claude Sonnet 4.6 generates radio reads, social posts, and infographic copy (Chart Talk cells) using chart_brief + feedback context
+4. **Infographic Rendering**: InfographicRendererFunction receives chart_data, renders `chart-poster.js` HTML/CSS template to 1280x720 PNG via Playwright, stores in S3
+5. **Campaign Storage**: Full campaign saved to ChartCampaigns table as immutable revision
 
-**IAM Permissions:**
-- DynamoDB: Query on Tracks Table
-- DynamoDB: GetItem on Config Table
-- DynamoDB: PutItem on Chart History Table
-- AgentCore: Invoke AgentCore Runtime
-- CloudWatch Logs: Write
+### Infographic Renderer Detail
 
-### AgentCore Tools
+- `chart-poster.js`: Data-driven HTML/CSS template
+- Font Awesome icons for movement indicators
+- Background image, logo, FA font loaded as base64 data URIs (no network dependencies at render time)
+- Chart Talk: 6 cells, each highlighting a different artist with AI-generated or auto-fallback commentary
+- Output: 1280x720 PNG stored in S3
 
-**Trigger:** AgentCore Gateway Lambda target
-**Runtime:** Python 3.14
-**Memory:** 512 MB
-**Timeout:** 60 seconds
+## Feedback Loop
 
-**Purpose:** Provide an IAM-authenticated MCP-style tool surface for agents
-without routing through API Gateway or Cognito.
+```
+Reviewer (Admin UI)
+        │
+        │ PUT /api/campaigns/{week_id} (feedback/review)
+        ▼
+┌───────────────────┐
+│ ApiFunction       │
+│ 1. Store in DB    │──→ ChartCampaigns table (review field)
+│ 2. Write memory   │──→ AgentCore Memory
+└───────────────────┘
 
-**Gateway:** Required AgentCore Gateway.
-**Memory:** Required AgentCore Memory.
+        ... next week ...
 
-**Tools:**
-- `get_current_chart`
-- `list_chart_weeks`
-- `get_chart_week`
-- `get_chart_range`
-- `create_chart_brief`
-- `create_radio_reads`
-- `create_infographic_content`
-- `create_social_posts`
-- `create_chart_campaign`
-- `list_chart_campaigns`
-- `get_chart_campaign`
-- `update_chart_campaign_status`
+┌─────────────────────────┐
+│ AgentCoreToolsFunction  │
+│ get_feedback tool        │──→ AgentCore Memory (semantic search)
+│                         │    retrieves past preferences
+│ generate_editorial       │──→ Claude adjusts tone/style
+└─────────────────────────┘
+```
 
-**IAM Permissions:**
-- Gateway role can invoke only `AgentCoreToolsFunction`
-- Tool Lambda can read chart history and config
-- Tool Lambda can read/write campaign drafts
-- Tool Lambda can retrieve/write AgentCore Memory
-- Tool Lambda does not require Cognito user tokens
+Reviewer feedback persists across generations. AgentCore Memory provides semantic retrieval so Claude adapts to editorial preferences without explicit rules.
 
-## Shared Layer
+## Deployment
 
-**Purpose:** Common utilities shared between Lambda functions
+- **SAM** (Serverless Application Model) for IaC
+- `template.yaml` defines all resources
+- `deploy.sh` wraps `sam build --use-container` + `sam deploy`
+- Multi-environment via `samconfig.toml` sections (`prod`, `dev`)
+- Frontend deployed to S3 with CloudFront invalidation
 
-**Contents:**
-- `common.py`: Utility functions
-  - Timestamp helpers
-  - Week calculation
-  - Hour block grouping
-  - JSON encoding for Decimal
-  - API response formatting
-  - CORS headers
-- `chart_brief.py`: Deterministic chart brief generation from Top 10 snapshots
-- `campaign_generation.py`: Structured campaign draft generation
-- `campaign_store.py`: DynamoDB access helpers for campaign workflows
-- `agent_context.py`: Agent spec and personal context metadata loading
+## Security Model
 
-## Frontend Architecture
-
-**Hosting:** Embedded in API Lambda (served at `/`)
-**Type:** Single-page application (SPA)
-**Framework:** Vanilla JavaScript (no dependencies)
-
-**Components:**
-1. Navigation (History / Top 10)
-2. History View (2-hour blocks)
-3. Top 10 View (ranked list)
-4. API Client (fetch)
-
-**Styling:** Inline CSS with responsive design
-
-## Scalability Considerations
-
-**Current Capacity:**
-- Poller: 1 invocation per minute = 43,200 invocations/month
-- DynamoDB: On-demand (auto-scales)
-- API Gateway: 10,000 requests per second limit (unlikely to hit)
-
-**Data Volume:**
-- ~1 track per 3 minutes average
-- ~480 tracks per day
-- ~3,360 tracks per week
-- ~14,400 tracks per month
-- TTL: Not currently configured; records are retained until manually deleted or the table is deleted
-
-**Cost Optimization:**
-- On-demand DynamoDB (no idle capacity costs)
-- Minimal Lambda memory (256 MB)
-- Retention can be capped later with DynamoDB TTL if storage growth requires it
-- No NAT Gateway required (public AWS service endpoints)
-
-## Security
-
-**Current:**
-- Cognito authentication on app API endpoints
-- CORS enabled for all origins
-- IAM roles use least-privilege
-- SSL for API Gateway
-- No secrets in code (stream URL in env var)
-
-**Production Recommendations:**
-- Add more granular authorization if roles/groups are introduced later
-- Restrict CORS to specific origins
-- Enable AWS WAF for DDoS protection
-- Add request throttling
-- Enable API Gateway logging
-- Use Secrets Manager for stream URL if needed
-- Enable DynamoDB point-in-time recovery
-
-## Monitoring
-
-**CloudWatch Metrics:**
-- Lambda invocations
-- Lambda errors
-- Lambda duration
-- DynamoDB read/write capacity
-- API Gateway requests
-- API Gateway 4xx/5xx errors
-
-**CloudWatch Logs:**
-- Lambda function logs
-- API Gateway access logs (optional)
-
-**Alarms (Recommended):**
-- Poller Lambda errors > 5 in 5 minutes
-- API Lambda errors > 10 in 5 minutes
-- DynamoDB throttling events
-
-## Disaster Recovery
-
-**Backup Strategy:**
-- DynamoDB: On-demand backups (manual)
-- Option: Enable point-in-time recovery
-- Code: Version controlled in Git
-
-**Recovery Time Objective (RTO):**
-- ~5 minutes (redeploy SAM stack)
-
-**Recovery Point Objective (RPO):**
-- 1 minute (track data loss = time since last poll)
-
-## Future Enhancements
-
-**Potential Features:**
-- WebSocket for real-time updates
-- User favorites/playlists
-- Historical chart comparison (month-over-month)
-- Export to CSV/PDF
-- Admin dashboard
-- Multiple streams support
-- Track metadata enrichment (album art, etc.)
-- Social sharing
-- Email/SMS notifications for favorite tracks
+- All API routes require Cognito JWT authentication
+- Scheduled workloads (campaign generation) run under IAM, not Cognito
+- AgentCore Gateway uses IAM auth with dedicated gateway role
+- CloudFront enforces HTTPS with OAC for S3
+- DynamoDB encrypted at rest
+- Least-privilege IAM policies per function

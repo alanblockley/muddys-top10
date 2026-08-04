@@ -1,54 +1,51 @@
-# Documentation Index
+# Documentation
 
-This folder is the canonical home for project documentation. The root `README.md` remains the high-level project overview; detailed current-state, operational, reference, future-state, and historical docs live here.
+## Core Documentation
 
-## Current System
+| Document | Description |
+|----------|-------------|
+| [ARCHITECTURE.md](ARCHITECTURE.md) | System architecture, component diagram, data flows |
+| [TECHNICAL.md](TECHNICAL.md) | Deployment, configuration, project structure, monitoring |
+| [USER_GUIDE.md](USER_GUIDE.md) | Admin UI guide for non-technical users |
 
-- [ARCHITECTURE.md](ARCHITECTURE.md) - Current AWS/SAM architecture, data flow, and access patterns.
-- [SECURITY_MODEL.md](SECURITY_MODEL.md) - Current Cognito-authenticated access model.
-- [COGNITO_SETUP.md](COGNITO_SETUP.md) - Creating and managing Cognito users.
-- [STREAM_FORMATS.md](STREAM_FORMATS.md) - Supported Shoutcast metadata formats.
-- [TRACK_VALIDATION.md](TRACK_VALIDATION.md) - Current validation and canonicalization system.
-- [CLEAN_TITLES.MD](CLEAN_TITLES.MD) - Title cleaning rules.
-- [FILTERS.md](FILTERS.md) - Banned-song/top-10 filter management.
-- [SOCIAL_MEDIA_EXPORT.md](SOCIAL_MEDIA_EXPORT.md) - Current browser-side infographic export feature.
-- [LISTENER_GUIDE.md](LISTENER_GUIDE.md) - Listener-facing explanation of the Top 10.
+## Operational Guides
 
-## Deployment And Operations
+| Document | Description |
+|----------|-------------|
+| [DEPLOYMENT.md](DEPLOYMENT.md) | Detailed deployment instructions and parameters |
+| [COGNITO_SETUP.md](COGNITO_SETUP.md) | User pool management, creating admin users |
+| [BACKFILL_GUIDE.md](BACKFILL_GUIDE.md) | DynamoDB data export/import, history backfill |
+| [TROUBLESHOOTING.md](TROUBLESHOOTING.md) | Common issues and debugging |
+| [SECURITY_MODEL.md](SECURITY_MODEL.md) | Authentication, authorization, IAM policies |
 
-- [QUICKSTART.md](QUICKSTART.md) - Fast deployment/startup guide.
-- [DEPLOYMENT.md](DEPLOYMENT.md) - Deployment guide and environment notes.
-- [DEPLOYMENT_CHECKLIST.md](DEPLOYMENT_CHECKLIST.md) - Deployment checklist.
-- [DEPLOY_SCRIPT_EXPLAINED.md](DEPLOY_SCRIPT_EXPLAINED.md) - Current `deploy.sh` flow.
-- [BACKFILL_GUIDE.md](BACKFILL_GUIDE.md) - Data maintenance, export/import, backfill, and cleanup tools.
-- [TROUBLESHOOTING.md](TROUBLESHOOTING.md) - Operational troubleshooting.
-- [review-cli/README.md](../review-cli/README.md) - Rust CLI for authenticated, read-only API data review.
+## Feature Documentation
 
-## Spotify
+| Document | Description |
+|----------|-------------|
+| [TRACK_VALIDATION.md](TRACK_VALIDATION.md) | MusicBrainz/Spotify validation system |
+| [STREAM_FORMATS.md](STREAM_FORMATS.md) | Shoutcast v1/v2 format detection |
+| [FILTERS.md](FILTERS.md) | Top 10 regex filter patterns |
+| [LISTENER_GUIDE.md](LISTENER_GUIDE.md) | How the chart works (for listeners/DJs) |
+| [SPOTIFY_API_CALLS.md](SPOTIFY_API_CALLS.md) | Spotify API integration details |
+| [SPOTIFY_PLAYLIST_SETUP.md](SPOTIFY_PLAYLIST_SETUP.md) | Spotify playlist configuration |
 
-- [SPOTIFY_PLAYLIST_SETUP.md](SPOTIFY_PLAYLIST_SETUP.md) - Recommended admin-panel Spotify setup.
-- [SPOTIFY_PLAYLIST_SETUP_CLI.md](SPOTIFY_PLAYLIST_SETUP_CLI.md) - Older command-line Spotify setup fallback.
-- [SPOTIFY_API_CALLS.md](SPOTIFY_API_CALLS.md) - Spotify API endpoint reference.
+## AI Context Files
 
-## Reference
+Located in `agentic/context/` — these are loaded by the campaign generation system to steer Claude's output:
 
-- [track_validation_logic.md](track_validation_logic.md) - Detailed validation/scoring logic.
+| File | Purpose |
+|------|---------|
+| `infographic-editorial-framework.md` | Chart Talk editorial categories and rules |
+| `personal-voice.md` | Alan's writing tone and style |
+| `muddys-venue-context.md` | Venue, community, Second Life context |
+| `radio-chart-show-convention.md` | Movement language and narrative conventions |
+| `chart-show-glossary.md` | Chart terminology |
+| `radio-read-examples.md` | Golden examples of radio read copy |
+| `social-style-examples.md` | Social post examples by platform |
+| `social-media-music-communities.md` | Community engagement patterns |
+| `words-and-phrases.md` | Preferred vocabulary |
+| `never-say.md` | Banned words and framing |
 
-## Future State
+## Archive
 
-- [AGENTCORE_CAMPAIGN_REQUIREMENTS.md](AGENTCORE_CAMPAIGN_REQUIREMENTS.md) - Planned AgentCore/MCP chart campaign generation requirements.
-- [agentic/README.md](agentic/README.md) - Agentic workflow journey, context packs, output contracts, review workflow, and roadmap.
-- [agent-spec/01a-Infographic-Agent-v3.md](agent-spec/01a-Infographic-Agent-v3.md) - Authoritative infographic editorial production-agent spec.
-- [agent-spec/01b-Generate-Infographic-Asset.md](agent-spec/01b-Generate-Infographic-Asset.md) - Deterministic final infographic asset renderer spec.
-- [../infographic-renderer/README.md](../infographic-renderer/README.md) - Standalone HTML/CSS/SVG plus Playwright renderer for final PNG assets.
-- [agent-spec/02-Social-Agent-v3.md](agent-spec/02-Social-Agent-v3.md) - Authoritative social media production-agent spec.
-- [agent-spec/03-Radio-Agent-v3.md](agent-spec/03-Radio-Agent-v3.md) - Authoritative radio reads production-agent spec.
-
-## Historical / Archive
-
-These documents are retained for context but may describe implementation history rather than current behavior.
-
-- [IMPLEMENTATION_SUMMARY.md](IMPLEMENTATION_SUMMARY.md) - Track validation implementation notes.
-- [PROJECT_SUMMARY.txt](PROJECT_SUMMARY.txt) - Historical project summary.
-- [archive/MANUAL_PLAYLIST_FEATURE.md](archive/MANUAL_PLAYLIST_FEATURE.md) - Manual playlist generation feature notes.
-- [archive/SPOTIFY_OAUTH_DEPLOYMENT.md](archive/SPOTIFY_OAUTH_DEPLOYMENT.md) - Historical Spotify OAuth deployment notes.
+Historical documents (planning, superseded specs, migration notes) are in `archive/`.
