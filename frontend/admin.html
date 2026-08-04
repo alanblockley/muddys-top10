@@ -470,6 +470,66 @@
             display: block;
         }
 
+        .settings-subtabs {
+            display: flex;
+            gap: 0;
+            border-bottom: 1px solid #334155;
+            margin-bottom: 16px;
+        }
+        .settings-subtab {
+            padding: 8px 16px;
+            border: none;
+            background: transparent;
+            color: #94a3b8;
+            font-size: 0.9em;
+            font-weight: 600;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+        }
+        .settings-subtab.active {
+            color: #a78bfa;
+            border-bottom-color: #a78bfa;
+        }
+        .settings-subtab:hover:not(.active) {
+            color: #e2e8f0;
+        }
+        .settings-panel {
+            display: none;
+        }
+        .settings-panel.active {
+            display: block;
+        }
+        .settings-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        .settings-group h4 {
+            color: #a78bfa;
+            font-size: 0.9rem;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .settings-row {
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .settings-row label {
+            font-size: 0.9em;
+            color: #e2e8f0;
+        }
+        .settings-row select, .settings-row input[type="number"] {
+            padding: 6px 10px;
+            background: #0a0e1a;
+            border: 1px solid #334155;
+            color: #e4e8f0;
+            border-radius: 4px;
+            font-size: 0.9em;
+        }
+
         .campaign-detail {
             background: #0a0e1a;
             border: 1px solid #1e293b;
@@ -1945,8 +2005,6 @@
 
             <div class="tabs">
                 <button class="tab-btn active" onclick="switchTab('history')">📜 History</button>
-                <button class="tab-btn" onclick="switchTab('filters')">🎚️ Filters</button>
-                <button class="tab-btn" onclick="switchTab('chart')">📊 Chart Reset</button>
                 <button class="tab-btn" onclick="switchTab('campaigns')">🧠 Campaigns</button>
                 <button class="tab-btn" onclick="switchTab('settings')">⚙️ Settings</button>
                 <button class="tab-btn" onclick="switchTab('rawdata')">📊 Raw Data</button>
@@ -1964,99 +2022,10 @@
             </div>
 
             <div id="tab-filters" class="tab-content">
-                <div class="card">
-                <h2 style="margin-bottom: 20px;">Top 10 Filters</h2>
-                <p class="help-text" style="margin-bottom: 15px;">
-                    Enter regex patterns (one per line) to exclude tracks from Top 10.
-                    Filtered tracks remain in history.
-                </p>
-
-                <div class="form-group">
-                    <label>Current Filters:</label>
-                    <div id="currentFilters" class="filter-list"></div>
-                </div>
-
-                <div class="form-group">
-                    <label for="filters">Update Filters:</label>
-                    <textarea id="filters" placeholder="^Muddy'?s Music Cafe&#10;^Muddy'?s Roadshow&#10;https?://"></textarea>
-                    <p class="help-text">One pattern per line. Use regex syntax.</p>
-                </div>
-
-                    <button onclick="saveFilters()" class="btn">Save Filters</button>
-                </div>
             </div>
 
             <div id="tab-chart" class="tab-content">
-                <div class="card">
-                    <h2 style="margin-bottom: 20px;">Chart Reset & Campaign Schedule</h2>
-                    <p class="help-text" style="margin-bottom: 15px;">
-                        Configure when the campaign is generated, when chart counting freezes, and when the next chart starts counting.
-                    </p>
-
-                <div class="form-group">
-                    <label for="chartDay">Reset Day:</label>
-                    <select id="chartDay">
-                        <option value="monday">Monday</option>
-                        <option value="tuesday">Tuesday</option>
-                        <option value="wednesday">Wednesday</option>
-                        <option value="thursday">Thursday</option>
-                        <option value="friday">Friday</option>
-                        <option value="saturday">Saturday</option>
-                        <option value="sunday">Sunday</option>
-                    </select>
-                </div>
-
-                <div class="form-group">
-                    <label for="chartHour">Reset Hour (0-23, SLT):</label>
-                    <input type="number" id="chartHour" min="0" max="23" value="0">
-                    <p class="help-text">The application calculates chart weeks in Second Life time / America/Los_Angeles.</p>
-                </div>
-
-                <div class="form-group" style="border-top: 1px solid #334155; padding-top: 18px; margin-top: 20px;">
-                    <label>
-                        <input type="checkbox" id="campaignGenerationEnabled" checked>
-                        Create weekly campaign automatically
-                    </label>
-                    <p class="help-text">When enabled, saving this config updates the timezone-aware campaign schedule.</p>
-                </div>
-
-                <div class="form-group">
-                    <label for="campaignDay">Campaign Generation Day:</label>
-                    <select id="campaignDay">
-                        <option value="monday">Monday</option>
-                        <option value="tuesday">Tuesday</option>
-                        <option value="wednesday">Wednesday</option>
-                        <option value="thursday">Thursday</option>
-                        <option value="friday">Friday</option>
-                        <option value="saturday">Saturday</option>
-                        <option value="sunday">Sunday</option>
-                    </select>
-                    <p class="help-text">This should normally be before reset, for example Saturday 02:00 SLT for a Saturday 04:00 reset.</p>
-                </div>
-
-                <div class="form-group">
-                    <label for="campaignHour">Campaign Generation Hour (0-23, SLT):</label>
-                    <input type="number" id="campaignHour" min="0" max="23" value="2">
-                </div>
-
-                <div class="form-group">
-                    <label>
-                        <input type="checkbox" id="freezeEnabled" checked>
-                        Freeze Top 10 counting between campaign generation and reset
-                    </label>
-                    <p class="help-text">Raw tracks are still retained, but plays during the freeze window are excluded from chart calculations to avoid Top 10 show play-out bias.</p>
-                </div>
-
-                    <button onclick="saveChartConfig()" class="btn">Save Reset & Campaign Schedule</button>
-                </div>
-
-                <div class="card">
-                    <h2 style="margin-bottom: 20px;">Current Week Campaign</h2>
-                    <p class="help-text" style="margin-bottom: 15px;">
-                        Generate a campaign from the unfinished current chart. This snapshots the current Top 10 first, then starts asynchronous campaign generation for that week.
-                    </p>
-                    <button id="generateCurrentCampaignBtn" onclick="generateCurrentWeekCampaign()" class="btn">Generate Current Week Campaign</button>
-                </div>
+            </div>
             </div>
 
             <div id="tab-rawdata" class="tab-content">
@@ -2085,73 +2054,113 @@
             </div>
 
             <div id="tab-settings" class="tab-content">
-                <div class="card">
-                    <h2 style="margin-bottom: 20px;">Data Verification Sources</h2>
-                    <p class="help-text" style="margin-bottom: 15px;">
-                        Manage external sources used to validate and canonicalize track names. These settings affect validation of newly-ingested tracks; existing track records are not rewritten automatically.
-                    </p>
-
-                    <div class="form-group">
-                        <label>
-                            <input type="checkbox" id="musicbrainzEnabled" checked>
-                            Use MusicBrainz for track validation
-                        </label>
-                        <p class="help-text">Primary open music metadata source. Recommended to keep enabled.</p>
-                    </div>
-
-                    <div class="form-group">
-                        <label>
-                            <input type="checkbox" id="spotifyValidationEnabled" checked>
-                            Use Spotify for track validation
-                        </label>
-                        <p class="help-text">Uses Spotify client credentials to improve match coverage. This is separate from Spotify playlist generation.</p>
-                    </div>
-
-                    <button onclick="saveVerificationSources()" class="btn">Save Verification Sources</button>
+                <div class="settings-subtabs">
+                    <button class="settings-subtab active" onclick="switchSettingsSubtab(event,'schedule')">Schedule</button>
+                    <button class="settings-subtab" onclick="switchSettingsSubtab(event,'filters')">Filters</button>
+                    <button class="settings-subtab" onclick="switchSettingsSubtab(event,'branding')">Branding</button>
+                    <button class="settings-subtab" onclick="switchSettingsSubtab(event,'validation')">Validation</button>
                 </div>
 
-                <div class="card">
-                    <h2 style="margin-bottom: 20px;">Campaign Branding</h2>
-
-                    <div class="form-group">
-                        <label for="brandingLogoUpload">Logo Image:</label>
-                        <div class="branding-logo-row">
-                            <div id="brandingLogoFrame" class="branding-logo-frame">
-                                <span>No custom logo uploaded</span>
+                <div class="settings-panel active" id="settingsSchedule">
+                    <div class="settings-grid">
+                        <div class="settings-group">
+                            <h4>Chart Reset</h4>
+                            <div class="settings-row">
+                                <label for="chartDay">Day:</label>
+                                <select id="chartDay">
+                                    <option value="monday">Monday</option>
+                                    <option value="tuesday">Tuesday</option>
+                                    <option value="wednesday">Wednesday</option>
+                                    <option value="thursday">Thursday</option>
+                                    <option value="friday">Friday</option>
+                                    <option value="saturday">Saturday</option>
+                                    <option value="sunday">Sunday</option>
+                                </select>
                             </div>
-                            <div class="branding-logo-controls">
-                                <input type="file" id="brandingLogoUpload" accept="image/png,image/jpeg,image/webp">
-                                <button id="brandingLogoUploadBtn" onclick="uploadCampaignLogo()" class="btn btn-secondary" type="button">Upload Logo</button>
-                                <p class="help-text" id="brandingLogoStatus">Current logo: bundled Muddy's dog logo. Upload PNG, JPEG, or WebP; large images are resized to fit within 512x512 before upload.</p>
+                            <div class="settings-row">
+                                <label for="chartHour">Hour (SLT):</label>
+                                <input type="number" id="chartHour" min="0" max="23" value="0" style="width:80px;">
+                            </div>
+                        </div>
+                        <div class="settings-group">
+                            <h4>Campaign Generation</h4>
+                            <div class="settings-row">
+                                <label for="campaignDay">Day:</label>
+                                <select id="campaignDay">
+                                    <option value="monday">Monday</option>
+                                    <option value="tuesday">Tuesday</option>
+                                    <option value="wednesday">Wednesday</option>
+                                    <option value="thursday">Thursday</option>
+                                    <option value="friday">Friday</option>
+                                    <option value="saturday">Saturday</option>
+                                    <option value="sunday">Sunday</option>
+                                </select>
+                            </div>
+                            <div class="settings-row">
+                                <label for="campaignHour">Hour (SLT):</label>
+                                <input type="number" id="campaignHour" min="0" max="23" value="2" style="width:80px;">
+                            </div>
+                            <div class="settings-row">
+                                <label><input type="checkbox" id="campaignGenerationEnabled" checked> Auto-generate weekly</label>
+                            </div>
+                            <div class="settings-row">
+                                <label><input type="checkbox" id="freezeEnabled" checked> Freeze counting before reset</label>
                             </div>
                         </div>
                     </div>
-
-                    <div class="form-group">
-                        <label for="infographicTemplateId">Infographic Layout Template:</label>
-                        <select id="infographicTemplateId" onchange="onTemplateSelected()">
-                        </select>
-                        <p class="help-text">Select a template to preview.</p>
-                        <div class="template-reference-row">
-                            <div id="templateReferenceFrame" class="template-reference-frame">
-                                <span>Select a template to see preview</span>
-                            </div>
-                            <div class="template-reference-controls">
-                                <p class="help-text" id="templateReferenceStatus">The preview shows how campaign infographics will look with this template.</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="form-group">
-                        <label>Uploaded Templates:</label>
-                        <div id="templateUploadsList" style="margin-bottom: 12px;">
-                            <span style="color: #64748b;">Loading...</span>
-                        </div>
-                        <button onclick="openTemplateUploadModal()" class="btn btn-secondary" type="button">Upload Template</button>
-                    </div>
-
-                    <button onclick="saveCampaignBranding()" class="btn">Save Campaign Branding</button>
+                    <button onclick="saveChartConfig()" class="btn" style="margin-top:12px;">Save Schedule</button>
+                    <button id="generateCurrentCampaignBtn" onclick="generateCurrentWeekCampaign()" class="btn btn-secondary" style="margin-top:12px;margin-left:8px;">Generate Current Week Now</button>
                 </div>
+
+                <div class="settings-panel" id="settingsFilters">
+                    <p class="help-text" style="margin-bottom:10px;">Regex patterns to exclude from Top 10. One per line.</p>
+                    <div id="currentFilters" class="filter-list" style="margin-bottom:10px;"></div>
+                    <textarea id="filters" placeholder="^Muddy'?s Music Cafe&#10;https?://" style="height:120px;"></textarea>
+                    <button onclick="saveFilters()" class="btn" style="margin-top:10px;">Save Filters</button>
+                </div>
+
+                <div class="settings-panel" id="settingsBranding">
+                    <div class="settings-grid">
+                        <div class="settings-group">
+                            <h4>Logo</h4>
+                            <div class="branding-logo-row" style="gap:10px;">
+                                <div id="brandingLogoFrame" class="branding-logo-frame" style="width:80px;height:80px;">
+                                    <span style="font-size:0.7em;">No logo</span>
+                                </div>
+                                <div>
+                                    <input type="file" id="brandingLogoUpload" accept="image/png,image/jpeg,image/webp" style="font-size:0.85em;">
+                                    <button id="brandingLogoUploadBtn" onclick="uploadCampaignLogo()" class="btn btn-secondary" type="button" style="margin-top:6px;padding:6px 12px;font-size:0.85em;">Upload</button>
+                                    <p class="help-text" id="brandingLogoStatus" style="margin-top:4px;">PNG, JPEG, or WebP. Resized to 512x512.</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="settings-group">
+                            <h4>Infographic Template</h4>
+                            <select id="infographicTemplateId" onchange="onTemplateSelected()" style="margin-bottom:8px;"></select>
+                            <div id="templateReferenceFrame" class="template-reference-frame" style="height:100px;">
+                                <span>Select a template</span>
+                            </div>
+                            <p class="help-text" id="templateReferenceStatus"></p>
+                            <div id="templateUploadsList" style="margin:8px 0;font-size:0.85em;"></div>
+                            <button onclick="openTemplateUploadModal()" class="btn btn-secondary" type="button" style="padding:6px 12px;font-size:0.85em;">Upload Template</button>
+                        </div>
+                    </div>
+                    <button onclick="saveCampaignBranding()" class="btn" style="margin-top:12px;">Save Branding</button>
+                </div>
+
+                <div class="settings-panel" id="settingsValidation">
+                    <div class="settings-grid">
+                        <div class="settings-group">
+                            <h4>Track Validation Sources</h4>
+                            <div class="settings-row">
+                                <label><input type="checkbox" id="musicbrainzEnabled" checked> MusicBrainz</label>
+                            </div>
+                            <div class="settings-row">
+                                <label><input type="checkbox" id="spotifyValidationEnabled" checked> Spotify</label>
+                            </div>
+                            <button onclick="saveVerificationSources()" class="btn" style="margin-top:10px;">Save</button>
+                </div>
+            </div>
 
             <div id="tab-campaigns" class="tab-content">
                 <div class="card">
@@ -2985,6 +2994,15 @@
             container.querySelectorAll('.campaign-content-panel').forEach(p => p.classList.remove('active'));
             event.target.classList.add('active');
             const panel = container.querySelector(`#campaignTab${tabId.charAt(0).toUpperCase() + tabId.slice(1)}`);
+            if (panel) panel.classList.add('active');
+        }
+
+        function switchSettingsSubtab(event, tabId) {
+            const container = document.getElementById('tab-settings');
+            container.querySelectorAll('.settings-subtab').forEach(t => t.classList.remove('active'));
+            container.querySelectorAll('.settings-panel').forEach(p => p.classList.remove('active'));
+            event.target.classList.add('active');
+            const panel = container.querySelector(`#settings${tabId.charAt(0).toUpperCase() + tabId.slice(1)}`);
             if (panel) panel.classList.add('active');
         }
 
