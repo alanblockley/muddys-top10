@@ -2112,9 +2112,6 @@
 
                 <div class="card">
                     <h2 style="margin-bottom: 20px;">Campaign Branding</h2>
-                    <p class="help-text" style="margin-bottom: 15px;">
-                        Static non-negotiable branding used by all newly generated campaign assets. These are controlled selectors so the campaign agent can be creative without changing core brand identity.
-                    </p>
 
                     <div class="form-group">
                         <label for="brandingLogoUpload">Logo Image:</label>
@@ -2131,72 +2128,10 @@
                     </div>
 
                     <div class="form-group">
-                        <label for="brandingChartTitle">Chart Title:</label>
-                        <input type="text" id="brandingChartTitle" maxlength="96" placeholder="Muddy's Top 10" oninput="updateFontPreview()">
-                    </div>
-
-                    <div class="form-group">
-                        <label for="brandingTagline">Tag Line:</label>
-                        <input type="text" id="brandingTagline" maxlength="96" placeholder="Your requests. Your music. Your chart." oninput="updateFontPreview()">
-                    </div>
-
-                    <div class="form-group">
-                        <label>Colour Scheme:</label>
-                        <div class="branding-color-grid">
-                            <label for="brandingPrimaryColor">Primary
-                                <input type="color" id="brandingPrimaryColor" value="#a855f7" onchange="updateFontPreview()">
-                            </label>
-                            <label for="brandingSecondaryColor">Secondary
-                                <input type="color" id="brandingSecondaryColor" value="#facc15">
-                            </label>
-                            <label for="brandingAccentColor">Accent
-                                <input type="color" id="brandingAccentColor" value="#d946ef">
-                            </label>
-                            <label for="brandingBackgroundColor">Background
-                                <input type="color" id="brandingBackgroundColor" value="#050005">
-                            </label>
-                            <label for="brandingTextColor">Text
-                                <input type="color" id="brandingTextColor" value="#f8fafc" onchange="updateFontPreview()">
-                            </label>
-                        </div>
-                        <p class="help-text">These colours are supplied to the campaign agent and renderer as stable brand tokens.</p>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="brandingFontFamily">Font Style:</label>
-                        <div class="font-preview-row">
-                            <select id="brandingFontFamily" onchange="updateFontPreview()">
-                                <option value="arial">Arial</option>
-                                <option value="arial_black">Arial Black</option>
-                                <option value="arial_narrow">Arial Narrow</option>
-                                <option value="verdana">Verdana</option>
-                                <option value="tahoma">Tahoma</option>
-                                <option value="trebuchet">Trebuchet MS</option>
-                                <option value="impact">Impact</option>
-                                <option value="georgia">Georgia</option>
-                                <option value="times">Times New Roman</option>
-                                <option value="palatino">Palatino</option>
-                                <option value="garamond">Garamond</option>
-                                <option value="courier">Courier New</option>
-                                <option value="lucida_console">Lucida Console</option>
-                                <option value="brush_script">Brush Script MT</option>
-                                <option value="condensed_poster">Condensed poster</option>
-                                <option value="clean_broadcast">Clean broadcast</option>
-                                <option value="classic_impact">Classic impact</option>
-                            </select>
-                            <div id="brandingFontPreview" class="font-preview">
-                                <strong>Muddy's Top 10</strong>
-                                <span>Your requests. Your music. Your chart.</span>
-                            </div>
-                        </div>
-                        <p class="help-text">These are common web-safe font stacks. Actual rendering can still vary slightly by operating system.</p>
-                    </div>
-
-                    <div class="form-group">
                         <label for="infographicTemplateId">Infographic Layout Template:</label>
                         <select id="infographicTemplateId" onchange="onTemplateSelected()">
                         </select>
-                        <p class="help-text">Select a template to preview. Uploaded templates show immediately; built-in templates generate a reference preview.</p>
+                        <p class="help-text">Select a template to preview.</p>
                         <div class="template-reference-row">
                             <div id="templateReferenceFrame" class="template-reference-frame">
                                 <span>Select a template to see preview</span>
@@ -2217,45 +2152,6 @@
 
                     <button onclick="saveCampaignBranding()" class="btn">Save Campaign Branding</button>
                 </div>
-
-                <div class="card">
-                    <h2 style="margin-bottom: 20px;">Campaign Prompt Management</h2>
-                    <p class="help-text" style="margin-bottom: 15px;">
-                        Optional Bedrock Prompt Management references for future campaign generations. Leave blank to use the built-in production prompt for that section.
-                    </p>
-
-                    <div class="form-group">
-                        <label for="promptRadioReadsId">Radio Reads Prompt Identifier:</label>
-                        <input type="text" id="promptRadioReadsId" placeholder="Prompt ID or ARN">
-                        <label for="promptRadioReadsVersion">Version:</label>
-                        <input type="text" id="promptRadioReadsVersion" placeholder="e.g. 1">
-                    </div>
-
-                    <div class="form-group">
-                        <label for="promptInfographicId">Infographic Content Prompt Identifier:</label>
-                        <input type="text" id="promptInfographicId" placeholder="Prompt ID or ARN">
-                        <label for="promptInfographicVersion">Version:</label>
-                        <input type="text" id="promptInfographicVersion" placeholder="e.g. 1">
-                    </div>
-
-                    <div class="form-group">
-                        <label for="promptSocialId">Social Copy Prompt Identifier:</label>
-                        <input type="text" id="promptSocialId" placeholder="Prompt ID or ARN">
-                        <label for="promptSocialVersion">Version:</label>
-                        <input type="text" id="promptSocialVersion" placeholder="e.g. 1">
-                    </div>
-
-                    <div class="form-group">
-                        <label for="promptInfographicAssetId">Infographic HTML/CSS Prompt Identifier:</label>
-                        <input type="text" id="promptInfographicAssetId" placeholder="Prompt ID or ARN">
-                        <label for="promptInfographicAssetVersion">Version:</label>
-                        <input type="text" id="promptInfographicAssetVersion" placeholder="e.g. 1">
-                        <p class="help-text">This prompt produces the final campaign-specific HTML/CSS that is rendered to PNG.</p>
-                    </div>
-
-                    <button onclick="saveCampaignPrompts()" class="btn">Save Campaign Prompts</button>
-                </div>
-            </div>
 
             <div id="tab-campaigns" class="tab-content">
                 <div class="card">
