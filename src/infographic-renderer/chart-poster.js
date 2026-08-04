@@ -15,6 +15,13 @@ const CANVAS_HEIGHT = 720;
  * Build the complete HTML document for the chart poster.
  */
 function buildPosterHtml(data) {
+  const branding = data.branding || {};
+  const primary = branding.primary_color || '${primary}';
+  const secondary = branding.secondary_color || '${secondary}';
+  const accent = branding.accent_color || '${accent}';
+  const bgColor = branding.background_color || '#050005';
+  const textColor = branding.text_color || '${textColor}';
+
   const tracks = (data.tracks || []).slice(0, 10);
   const stats = data.stats || {};
   const show = data.show || {};
@@ -67,7 +74,7 @@ html, body {
   overflow: hidden;
   background: #050008;
   font-family: 'Arial Narrow', 'Trebuchet MS', Arial, sans-serif;
-  color: #f8fafc;
+  color: ${textColor};
 }
 .poster {
   width: ${CANVAS_WIDTH}px;
@@ -107,7 +114,7 @@ html, body {
   text-transform: uppercase;
   letter-spacing: 0.05em;
   font-family: 'Arial Black', 'Arial Narrow', 'Impact', sans-serif;
-  color: #f8fafc;
+  color: ${textColor};
   text-shadow: 0 2px 12px rgba(168,85,247,0.5);
 }
 .header-title h1 .venue-name {
@@ -117,7 +124,7 @@ html, body {
   font-weight: 700;
   text-transform: none;
   letter-spacing: 0.01em;
-  color: #facc15;
+  color: ${secondary};
   text-shadow: 0 0 10px rgba(250,204,21,0.3);
 }
 .header-title h1 .chart-name {
@@ -127,13 +134,13 @@ html, body {
   font-weight: 900;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: #f8fafc;
+  color: ${textColor};
   text-shadow: 0 2px 12px rgba(168,85,247,0.5);
 }
 .header-title .subtitle {
   font-size: 16px;
   font-weight: 700;
-  color: #facc15;
+  color: ${secondary};
   text-transform: none;
   letter-spacing: 0.02em;
   margin-top: -8px;
@@ -146,13 +153,13 @@ html, body {
 }
 .header-title .subtitle::before {
   content: '✦ ';
-  color: #a855f7;
+  color: ${primary};
 }
 .header-title .subtitle::after {
   content: ' ✦';
-  color: #a855f7;
+  color: ${primary};
 }
-.header-title h1 .accent { color: #a855f7; }
+.header-title h1 .accent { color: ${primary}; }
 .header-week {
   text-align: right;
   padding: 8px 0;
@@ -164,14 +171,14 @@ html, body {
 .header-week .tagline-accent {
   display: block;
   height: 2px;
-  background: linear-gradient(90deg, transparent, #a855f7, #facc15);
+  background: linear-gradient(90deg, transparent, ${primary}, ${secondary});
   margin: 8px 0;
   border-radius: 1px;
 }
 .header-week .tagline {
   font-size: 22px;
   font-weight: 700;
-  color: #facc15;
+  color: ${secondary};
   font-style: italic;
   letter-spacing: 0.02em;
 }
@@ -201,7 +208,7 @@ html, body {
   height: 36px;
   text-align: center;
   color: #ffffff;
-  background: linear-gradient(135deg, #a855f7, #6d28d9);
+  background: linear-gradient(135deg, ${primary}, #6d28d9);
   border-radius: 4px;
   line-height: 36px;
 }
@@ -214,17 +221,17 @@ html, body {
 .track-row .artist {
   font-size: 19px;
   font-weight: 800;
-  color: #a855f7;
+  color: ${primary};
 }
 .track-row .title {
   font-size: 19px;
-  color: #f8fafc;
+  color: ${textColor};
   margin-left: 8px;
 }
 .track-row .plays {
   font-size: 16px;
   font-weight: 700;
-  color: #facc15;
+  color: ${secondary};
   text-align: center;
   width: 42px;
   line-height: 1.1;
@@ -250,7 +257,7 @@ html, body {
 }
 .track-row.up .movement-icon, .track-row.up .movement-delta { color: #22c55e; }
 .track-row.down .movement-icon, .track-row.down .movement-delta { color: #ef4444; }
-.track-row.new .movement-icon, .track-row.new .movement-delta { color: #facc15; }
+.track-row.new .movement-icon, .track-row.new .movement-delta { color: ${secondary}; }
 .track-row.same .movement-icon, .track-row.same .movement-delta { color: #94a3b8; }
 .track-row.reentry .movement-icon, .track-row.reentry .movement-delta { color: #38bdf8; }
 
@@ -264,7 +271,7 @@ html, body {
   text-align: center;
   font-size: 18px;
   font-weight: 900;
-  color: #facc15;
+  color: ${secondary};
   text-transform: uppercase;
   letter-spacing: 0.05em;
   background: linear-gradient(90deg, transparent 10%, rgba(250,204,21,0.15) 50%, transparent 90%);
@@ -296,7 +303,7 @@ html, body {
   font-size: 24px;
   line-height: 1;
   flex-shrink: 0;
-  color: #facc15;
+  color: ${secondary};
   text-shadow: 0 0 6px rgba(250,204,21,0.4);
   width: 30px;
   text-align: center;
@@ -308,7 +315,7 @@ html, body {
   font-family: Arial, Helvetica, sans-serif;
 }
 .chart-talk-cell .cell-text strong {
-  color: #facc15;
+  color: ${secondary};
   font-size: 13px;
   letter-spacing: 0.03em;
 }
@@ -329,7 +336,7 @@ html, body {
 .stats-strip-panel .panel-title {
   font-size: 9px;
   font-weight: 700;
-  color: #facc15;
+  color: ${secondary};
   text-transform: uppercase;
   margin-bottom: 4px;
 }
@@ -362,7 +369,7 @@ html, body {
 }
 .footer-show .line2 {
   font-size: 26px;
-  color: #facc15;
+  color: ${secondary};
   font-weight: 900;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -379,7 +386,7 @@ html, body {
 }
 .footer-compiled {
   font-size: 16px;
-  color: #facc15;
+  color: ${secondary};
   font-style: italic;
   font-weight: 700;
   text-align: right;
@@ -392,14 +399,14 @@ html, body {
 .footer-compiled .compiled-accent {
   display: block;
   height: 2px;
-  background: linear-gradient(90deg, transparent, #a855f7, #facc15);
+  background: linear-gradient(90deg, transparent, ${primary}, ${secondary});
   margin: 8px 0;
   border-radius: 1px;
 }
 .footer-divider {
   width: 3px;
   align-self: stretch;
-  background: linear-gradient(180deg, #a855f7, #facc15);
+  background: linear-gradient(180deg, ${primary}, ${secondary});
   margin: 0 20px;
   border-radius: 2px;
 }
@@ -417,7 +424,7 @@ html, body {
 .footer-hosts .hosts-names {
   font-size: 22px;
   font-weight: 900;
-  color: #f8fafc;
+  color: ${textColor};
   text-transform: uppercase;
   letter-spacing: 0.05em;
   font-family: 'Arial Black', 'Impact', sans-serif;
@@ -425,14 +432,14 @@ html, body {
 .footer-hosts .hosts-tagline1 {
   font-size: 16px;
   font-weight: 700;
-  color: #facc15;
+  color: ${secondary};
   font-family: 'Segoe Script', 'Brush Script MT', 'Lucida Handwriting', cursive;
   text-shadow: 0 0 8px rgba(250,204,21,0.3);
 }
 .footer-hosts .hosts-tagline2 {
   font-size: 16px;
   font-weight: 700;
-  color: #facc15;
+  color: ${secondary};
   font-family: 'Segoe Script', 'Brush Script MT', 'Lucida Handwriting', cursive;
   text-shadow: 0 0 8px rgba(250,204,21,0.3);
 }
@@ -467,7 +474,7 @@ html, body {
       <div class="stats-strip">
         <div class="stats-strip-panel">
           <div class="panel-title">This Week's Story</div>
-          <div class="panel-row" style="font-weight:700;color:#facc15;">${escapeHtml(data.headline || '')}</div>
+          <div class="panel-row" style="font-weight:700;color:${secondary};">${escapeHtml(data.headline || '')}</div>
         </div>
         <div class="stats-strip-panel">
           <div class="panel-title">Chart Story</div>
@@ -475,7 +482,7 @@ html, body {
         </div>
         <div class="stats-strip-panel">
           <div class="panel-title">This Week's Stats</div>
-          <div class="panel-row"><span class="icon" style="color:#facc15">★</span>${stats.new_entries || 0} new entries</div>
+          <div class="panel-row"><span class="icon" style="color:${secondary}">★</span>${stats.new_entries || 0} new entries</div>
           <div class="panel-row"><span class="icon" style="color:#22c55e">▲</span>${stats.climbers || 0} climbers</div>
           <div class="panel-row"><span class="icon" style="color:#ef4444">▼</span>${stats.fallers || 0} fallers</div>
           <div class="panel-row"><span class="icon" style="color:#94a3b8">—</span>${stats.non_movers || 0} non-movers</div>

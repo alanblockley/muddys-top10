@@ -2135,14 +2135,25 @@
                             </div>
                         </div>
                         <div class="settings-group">
-                            <h4>Infographic Template</h4>
-                            <select id="infographicTemplateId" onchange="onTemplateSelected()" style="margin-bottom:8px;"></select>
-                            <div id="templateReferenceFrame" class="template-reference-frame" style="height:100px;">
-                                <span>Select a template</span>
+                            <h4>Identity</h4>
+                            <div class="settings-row">
+                                <label for="brandingChartTitle">Title:</label>
+                                <input type="text" id="brandingChartTitle" maxlength="96" placeholder="Muddy's Top 10" style="flex:1;">
                             </div>
-                            <p class="help-text" id="templateReferenceStatus"></p>
-                            <div id="templateUploadsList" style="margin:8px 0;font-size:0.85em;"></div>
-                            <button onclick="openTemplateUploadModal()" class="btn btn-secondary" type="button" style="padding:6px 12px;font-size:0.85em;">Upload Template</button>
+                            <div class="settings-row">
+                                <label for="brandingTagline">Tagline:</label>
+                                <input type="text" id="brandingTagline" maxlength="96" placeholder="Your requests. Your music. Your chart." style="flex:1;">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="settings-group" style="margin-top:16px;">
+                        <h4>Colours</h4>
+                        <div style="display:flex;gap:12px;flex-wrap:wrap;">
+                            <label style="font-size:0.85em;text-align:center;">Primary<br><input type="color" id="brandingPrimaryColor" value="#a855f7"></label>
+                            <label style="font-size:0.85em;text-align:center;">Secondary<br><input type="color" id="brandingSecondaryColor" value="#facc15"></label>
+                            <label style="font-size:0.85em;text-align:center;">Accent<br><input type="color" id="brandingAccentColor" value="#d946ef"></label>
+                            <label style="font-size:0.85em;text-align:center;">Background<br><input type="color" id="brandingBackgroundColor" value="#050005"></label>
+                            <label style="font-size:0.85em;text-align:center;">Text<br><input type="color" id="brandingTextColor" value="#f8fafc"></label>
                         </div>
                     </div>
                     <button onclick="saveCampaignBranding()" class="btn" style="margin-top:12px;">Save Branding</button>

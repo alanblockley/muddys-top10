@@ -282,9 +282,9 @@ def render_infographic_png(campaign, chart_brief=None):
 
     chart_brief = chart_brief or campaign.get('chart_brief') or {}
     infographic = campaign.get('infographic') or {}
-    branding = ((campaign.get('infographic_asset') or {}).get('metadata') or {}).get('brand_config_snapshot') or {}
+    branding = get_config_value('campaign_branding') or {}
 
-    # Build the chart_data payload for the AntV renderer
+    # Build the chart_data payload for the renderer
     tracks = chart_brief.get('tracks', [])[:10]
     print(f"Infographic renderer: {len(tracks)} tracks from chart_brief for week {campaign.get('week_id')}")
 
@@ -350,7 +350,14 @@ def render_infographic_png(campaign, chart_brief=None):
             'day': 'EVERY SATURDAY',
             'presenters': 'DJ TOOHEY & JP'
         },
-        'chart_talk': infographic.get('chart_talk') or []
+        'chart_talk': infographic.get('chart_talk') or [],
+        'branding': {
+            'primary_color': branding.get('primary_color') or '#a855f7',
+            'secondary_color': branding.get('secondary_color') or '#facc15',
+            'accent_color': branding.get('accent_color') or '#d946ef',
+            'background_color': branding.get('background_color') or '#050005',
+            'text_color': branding.get('text_color') or '#f8fafc',
+        }
     }
 
     response = lambda_client.invoke(
