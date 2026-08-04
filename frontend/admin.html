@@ -4403,29 +4403,6 @@
                 setInputValue('brandingAccentColor', campaignBranding.accent_color || '#d946ef');
                 setInputValue('brandingBackgroundColor', campaignBranding.background_color || '#050005');
                 setInputValue('brandingTextColor', campaignBranding.text_color || '#f8fafc');
-                setSelectValue('brandingFontFamily', campaignBranding.font_family || 'condensed_poster');
-                updateFontPreview();
-                renderInfographicTemplateOptions(data.campaign_infographic_template_options || []);
-                const infographicTemplate = data.campaign_infographic_template || {};
-                await loadTemplateUploadsList();
-                if (infographicTemplate.source === 'uploaded' && infographicTemplate.s3_key) {
-                    setSelectValue('infographicTemplateId', 'uploaded_' + infographicTemplate.s3_key);
-                } else {
-                    setSelectValue('infographicTemplateId', infographicTemplate.template_id || '');
-                }
-                // Show the preview for the currently selected template
-                if (infographicTemplate.source === 'uploaded' && infographicTemplate.reference_png_url) {
-                    const frame = document.getElementById('templateReferenceFrame');
-                    const status = document.getElementById('templateReferenceStatus');
-                    if (frame) {
-                        frame.classList.add('has-preview');
-                        frame.innerHTML = `<img src="${escapeHtml(infographicTemplate.reference_png_url)}" alt="Current infographic template preview">`;
-                    }
-                    if (status) status.textContent = `${infographicTemplate.name || 'Uploaded template'} — active template for campaign generation.`;
-                } else {
-                    updateTemplateReferenceStatus(infographicTemplate);
-                }
-                populateCampaignPromptSettings(data.campaign_prompts || {});
 
                 hideLoading();
             } catch (error) {
@@ -4531,28 +4508,8 @@
                     secondary_color: document.getElementById('brandingSecondaryColor').value,
                     accent_color: document.getElementById('brandingAccentColor').value,
                     background_color: document.getElementById('brandingBackgroundColor').value,
-                    text_color: document.getElementById('brandingTextColor').value,
-                    font_family: document.getElementById('brandingFontFamily').value
+                    text_color: document.getElementById('brandingTextColor').value
                 };
-                const templateValue = document.getElementById('infographicTemplateId').value;
-                let templateConfig;
-                if (templateValue.startsWith('uploaded_')) {
-                    const s3Key = templateValue.replace('uploaded_', '');
-                    const selectedOption = document.getElementById('infographicTemplateId').selectedOptions[0];
-                    templateConfig = {
-                        template_id: 'uploaded',
-                        version: '1',
-                        source: 'uploaded',
-                        s3_key: s3Key,
-                        name: selectedOption ? selectedOption.textContent.trim() : ''
-                    };
-                } else {
-                    templateConfig = {
-                        template_id: templateValue,
-                        version: '1',
-                        source: 'built_in'
-                    };
-                }
 
                 const response = await fetch(`${CONFIG.apiEndpoint}/config`, {
                     method: 'PUT',
@@ -4561,8 +4518,7 @@
                         'Authorization': accessToken
                     },
                     body: JSON.stringify({
-                        campaign_branding: config,
-                        campaign_infographic_template: templateConfig
+                        campaign_branding: config
                     })
                 });
 
