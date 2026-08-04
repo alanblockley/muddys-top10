@@ -2996,6 +2996,28 @@
                 .map(input => input.value);
         }
 
+        async function regenerateCampaign(weekId) {
+            if (!confirm(`Regenerate campaign for week ${weekId}? This will create a new revision using any feedback you've provided.`)) {
+                return;
+            }
+            showLoading();
+            try {
+                const data = await campaignApi('/campaigns/generate', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        week_id: weekId,
+                        sections: ['radio', 'infographic', 'social']
+                    })
+                });
+                await refreshCampaignManagement();
+                showSuccess('Regeneration started. Feedback will be used to shape the new version.');
+            } catch (error) {
+                showError('Failed to regenerate: ' + error.message);
+            } finally {
+                hideLoading();
+            }
+        }
+
         function renderCampaignDetail(campaign) {
             if (!campaign) {
                 document.getElementById('campaignModalContent').innerHTML = '<div style="color: #94a3b8;">Campaign not found.</div>';
@@ -3021,6 +3043,7 @@
                 </div>
 
                 <div class="campaign-actions">
+                    <button onclick="regenerateCampaign('${escapeHtml(campaign.week_id)}')" class="btn" style="background: linear-gradient(135deg, #a855f7, #6d28d9);">🔄 Regenerate</button>
                     <button onclick="updateCampaignStatus('draft')" class="btn btn-secondary">Mark Draft</button>
                     <button onclick="updateCampaignStatus('reviewed')" class="btn btn-secondary">Mark Reviewed</button>
                     <button onclick="updateCampaignStatus('approved')" class="btn btn-secondary">Approve</button>
