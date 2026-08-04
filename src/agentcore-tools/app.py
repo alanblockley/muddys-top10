@@ -7,7 +7,7 @@ in context.client_context.custom.bedrockAgentCoreToolName.
 import json
 import os
 import base64
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import boto3
 from boto3.dynamodb.conditions import Key
@@ -288,6 +288,27 @@ def render_infographic_png(campaign, chart_brief=None):
     tracks = chart_brief.get('tracks', [])[:10]
     print(f"Infographic renderer: {len(tracks)} tracks from chart_brief for week {campaign.get('week_id')}")
 
+    def format_week_display(week_id):
+        """Format week_id (YYYY-MM-DD) as '25 July – 1 August 2026'."""
+        if not week_id:
+            return ''
+        months = ['January','February','March','April','May','June','July','August','September','October','November','December']
+        try:
+            parts = str(week_id).split('-')
+            start = datetime(int(parts[0]), int(parts[1]), int(parts[2]))
+            end = start + timedelta(days=7)
+            start_str = f"{start.day} {months[start.month - 1]}"
+            if start.month == end.month and start.year == end.year:
+                end_str = f"{end.day} {months[end.month - 1]} {end.year}"
+            elif start.year == end.year:
+                end_str = f"{end.day} {months[end.month - 1]} {end.year}"
+            else:
+                start_str = f"{start.day} {months[start.month - 1]} {start.year}"
+                end_str = f"{end.day} {months[end.month - 1]} {end.year}"
+            return f"{start_str} – {end_str}"
+        except Exception:
+            return f"Week of {week_id}"
+
     def extract_artist(track):
         if track.get('artist'):
             return track['artist']
@@ -304,7 +325,7 @@ def render_infographic_png(campaign, chart_brief=None):
         'week_id': campaign.get('week_id', 'unknown'),
         'chart_title': branding.get('chart_title') or "Muddy's Top 10",
         'tagline': branding.get('tagline') or 'Your requests. Your music. Your chart.',
-        'week_display': chart_brief.get('week_display') or f"Week of {campaign.get('week_id', '')}",
+        'week_display': format_week_display(campaign.get('week_id', '')),
         'headline': infographic.get('headline') or infographic.get('chart_story', ''),
         'chart_story': infographic.get('chart_story') or '',
         'tracks': [
@@ -349,182 +370,6 @@ def render_infographic_png(campaign, chart_brief=None):
     if not result.get('infographic_png'):
         raise RuntimeError('Infographic renderer did not return infographic_png metadata')
     return result['infographic_png']
-
-
-def render_model_infographic_png(campaign):
-    model_id = os.environ.get('CAMPAIGN_IMAGE_MODEL_ID', '').strip()
-    if not model_id:
-        return None
-    try:
-        reference = infographic_reference_image_for_campaign(campaign)
-        if not reference:
-            print('Campaign image model configured, but no template reference PNG is available; using Playwright renderer.')
-            return None
-        prompt = build_infographic_image_prompt(campaign)
-        image_bytes = generate_image_with_openai_responses(prompt, reference, model_id)
-        return store_model_infographic_png(campaign, image_bytes, model_id, reference)
-    except Exception as e:
-        print(f"Model infographic PNG generation failed; using Playwright renderer: {e}")
-        return None
-
-
-def infographic_reference_image_for_campaign(campaign):
-    bucket = os.environ.get('CAMPAIGN_ASSETS_BUCKET')
-    key = (((campaign.get('infographic_asset') or {}).get('metadata') or {}).get('template_reference_png_key'))
-    if not bucket or not key:
-        return None
-    response = s3_client.get_object(Bucket=bucket, Key=key)
-    body = response['Body'].read()
-    content_type = response.get('ContentType') or 'image/png'
-    return {
-        'bucket': bucket,
-        'key': key,
-        'content_type': content_type,
-        'data_uri': f"data:{content_type};base64,{base64.b64encode(body).decode('ascii')}"
-    }
-
-
-def build_infographic_image_prompt(campaign):
-    chart_brief = campaign.get('chart_brief') or {}
-    infographic = campaign.get('infographic') or {}
-    asset = campaign.get('infographic_asset') or {}
-    metadata = asset.get('metadata') or {}
-    branding = metadata.get('brand_config_snapshot') or {}
-    return (
-        "Create the final Muddy's Music Cafe Top 10 infographic as a finished 16:9 PNG image.\n"
-        "Use the attached PNG as the visual reference for brand feel, density, layout discipline, and poster style.\n"
-        "Do not copy the reference content; replace it with the chart data supplied below.\n"
-        "Target composition: 1280x720, landscape, polished radio-show/social-poster quality.\n"
-        "Must include: logo area, chart title, tag line, ranked Top 10 table, artist/title, play count, movement versus last week, and right-side chart facts/statistics.\n"
-        "Text must be legible at social-media preview size. Avoid tiny decorative copy.\n"
-        "Facts are authoritative. Do not invent songs, ranks, movements, play counts, artists, or dates.\n"
-        "Non-negotiable brand values must be represented exactly where text is used.\n\n"
-        f"NON-NEGOTIABLE BRAND JSON:\n{json.dumps(branding, indent=2, default=str)}\n\n"
-        f"INFOGRAPHIC CONTENT JSON:\n{json.dumps(infographic, indent=2, default=str)}\n\n"
-        f"CHART BRIEF JSON:\n{json.dumps(chart_brief, indent=2, default=str)}\n"
-    )
-
-
-def generate_image_with_openai_responses(prompt, reference, model_id):
-    from openai import OpenAI
-
-    api_key = model_api_key()
-    region = os.environ.get('AWS_REGION') or os.environ.get('AWS_DEFAULT_REGION') or 'us-west-2'
-    base_url = os.environ.get(
-        'CAMPAIGN_IMAGE_MODEL_BASE_URL',
-        os.environ.get('CAMPAIGN_MODEL_BASE_URL', f'https://bedrock-mantle.{region}.api.aws/v1')
-    ).rstrip('/')
-    project_id = os.environ.get('CAMPAIGN_IMAGE_MODEL_PROJECT_ID') or os.environ.get('CAMPAIGN_MODEL_PROJECT_ID')
-    headers = {}
-    if project_id:
-        headers['OpenAI-Project'] = project_id
-
-    client_args = {
-        'api_key': api_key,
-        'base_url': base_url,
-        'timeout': float(os.environ.get('CAMPAIGN_IMAGE_MODEL_READ_TIMEOUT_SECONDS', '180'))
-    }
-    if headers:
-        client_args['default_headers'] = headers
-    client = OpenAI(**client_args)
-    response = client.responses.create(
-        model=model_id,
-        input=[{
-            'role': 'user',
-            'content': [
-                {'type': 'input_text', 'text': prompt},
-                {'type': 'input_image', 'image_url': reference['data_uri']}
-            ]
-        }],
-        tools=[{
-            'type': 'image_generation',
-            'size': os.environ.get('CAMPAIGN_IMAGE_SIZE', '1280x720')
-        }]
-    )
-    encoded = extract_response_image_base64(response)
-    if not encoded:
-        raise RuntimeError('Image model response did not include base64 image output')
-    return base64.b64decode(encoded)
-
-
-def extract_response_image_base64(response):
-    output = getattr(response, 'output', None)
-    if output is None and isinstance(response, dict):
-        output = response.get('output')
-    for item in output or []:
-        item_type = getattr(item, 'type', None) or (item.get('type') if isinstance(item, dict) else None)
-        result = getattr(item, 'result', None) or (item.get('result') if isinstance(item, dict) else None)
-        if item_type in {'image_generation_call', 'output_image'} and result:
-            return result
-        content = getattr(item, 'content', None) or (item.get('content') if isinstance(item, dict) else None)
-        for block in content or []:
-            block_type = getattr(block, 'type', None) or (block.get('type') if isinstance(block, dict) else None)
-            image = getattr(block, 'image', None) or (block.get('image') if isinstance(block, dict) else None)
-            if block_type in {'output_image', 'image'}:
-                if isinstance(image, dict) and image.get('b64_json'):
-                    return image['b64_json']
-                if getattr(image, 'b64_json', None):
-                    return image.b64_json
-            b64_json = getattr(block, 'b64_json', None) or (block.get('b64_json') if isinstance(block, dict) else None)
-            if b64_json:
-                return b64_json
-    return None
-
-
-def store_model_infographic_png(campaign, image_bytes, model_id, reference):
-    bucket = os.environ.get('CAMPAIGN_ASSETS_BUCKET')
-    if not bucket:
-        raise RuntimeError('CAMPAIGN_ASSETS_BUCKET is not configured')
-    generated_at = datetime.now(timezone.utc).isoformat()
-    safe_week_id = ''.join(ch if ch.isalnum() or ch in {'-', '_'} else '-' for ch in campaign['week_id'])
-    key = f"campaigns/{safe_week_id}/infographic-model-{generated_at.replace(':', '-').replace('.', '-')}.png"
-    s3_client.put_object(
-        Bucket=bucket,
-        Key=key,
-        Body=image_bytes,
-        ContentType='image/png',
-        CacheControl='private, max-age=31536000',
-        Metadata={
-            'week_id': campaign['week_id'],
-            'generation_mode': 'model_image',
-            'model_id': model_id,
-            'reference_png_key': reference.get('key') or ''
-        }
-    )
-    return {
-        'bucket': bucket,
-        'key': key,
-        'content_type': 'image/png',
-        'width': 1280,
-        'height': 720,
-        'size_bytes': len(image_bytes),
-        'generated_at': generated_at,
-        'source_snapshot_key': campaign.get('source_snapshot_key'),
-        'generation_mode': 'model_image',
-        'model': model_id,
-        'reference_png_key': reference.get('key')
-    }
-
-
-def model_api_key():
-    secret_arn = (
-        os.environ.get('CAMPAIGN_IMAGE_MODEL_API_KEY_SECRET_ARN', '').strip()
-        or os.environ.get('CAMPAIGN_MODEL_API_KEY_SECRET_ARN', '').strip()
-    )
-    if not secret_arn:
-        raise RuntimeError('CAMPAIGN_IMAGE_MODEL_API_KEY_SECRET_ARN or CAMPAIGN_MODEL_API_KEY_SECRET_ARN is required for model PNG generation')
-    secret = boto3.client('secretsmanager').get_secret_value(SecretId=secret_arn)
-    value = secret.get('SecretString') or ''
-    try:
-        parsed = json.loads(value)
-        value = parsed.get('api_key') or parsed.get('bedrock_api_key') or parsed.get('key') or value
-    except json.JSONDecodeError:
-        pass
-    value = str(value).strip()
-    if not value:
-        raise RuntimeError('Image model API key secret is empty')
-    return value
-
 
 def get_config_value(config_key):
     response = config_table.get_item(Key={'configKey': config_key})

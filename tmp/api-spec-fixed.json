@@ -1,0 +1,170 @@
+{
+  "openapi": "3.0.1",
+  "info": {
+    "title": "muddys-now-playing-api",
+    "version": "1.0"
+  },
+  "servers": [
+    {
+      "url": "https://wdab7zswkb.execute-api.us-west-2.amazonaws.com/{basePath}",
+      "variables": {
+        "basePath": {
+          "default": "Prod"
+        }
+      }
+    }
+  ],
+  "paths": {
+    "/api/top10": {
+      "get": {
+        "summary": "Get Top 10 chart",
+        "description": "Returns the current Top 10 tracks with movement indicators, play counts, and chart period information.",
+        "security": [
+          {
+            "CognitoAuthorizer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Top 10 chart data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "top10": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "rank": {
+                            "type": "integer"
+                          },
+                          "track": {
+                            "type": "string"
+                          },
+                          "play_count": {
+                            "type": "integer"
+                          },
+                          "previous_rank": {
+                            "type": "integer"
+                          },
+                          "movement": {
+                            "type": "string",
+                            "enum": ["up", "down", "same", "new"]
+                          },
+                          "movement_delta": {
+                            "type": "integer"
+                          }
+                        }
+                      }
+                    },
+                    "chart_date": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "week_start": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "week_end": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/history": {
+      "get": {
+        "summary": "Get track history",
+        "description": "Returns track history grouped by 2-hour blocks for the last 7 days in PST timezone.",
+        "security": [
+          {
+            "CognitoAuthorizer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Track history grouped by 2-hour blocks",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "blocks": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "block_timestamp": {
+                            "type": "integer"
+                          },
+                          "block_label": {
+                            "type": "string"
+                          },
+                          "tracks": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "timestamp": {
+                                  "type": "integer"
+                                },
+                                "formatted_time": {
+                                  "type": "string"
+                                },
+                                "track": {
+                                  "type": "string"
+                                },
+                                "raw_track": {
+                                  "type": "string"
+                                },
+                                "validation_status": {
+                                  "type": "string"
+                                },
+                                "artist": {
+                                  "type": "string"
+                                },
+                                "title": {
+                                  "type": "string"
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "total_tracks": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "CognitoAuthorizer": {
+        "type": "apiKey",
+        "name": "Authorization",
+        "in": "header",
+        "x-amazon-apigateway-authtype": "cognito_user_pools"
+      }
+    }
+  }
+}

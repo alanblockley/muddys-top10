@@ -1,0 +1,318 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Muddy's Top 10 MCP - Complete AgentCore Gateway stack.
+  Deploys a Lambda tool target, AgentCore Gateway, Gateway Target,
+  and all required IAM roles. No changes to the main application stack.
+
+Parameters:
+  TracksTableName:
+    Type: String
+    Default: muddys-now-playing-tracks
+  ConfigTableName:
+    Type: String
+    Default: muddys-now-playing-config
+  GatewayName:
+    Type: String
+    Default: muddys-top10-mcp
+
+Resources:
+  # --- Lambda: MCP Tool Handler ---
+  McpToolsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "${GatewayName}-tools"
+      Handler: app.lambda_handler
+      Runtime: python3.12
+      CodeUri: .
+      MemorySize: 256
+      Timeout: 30
+      Environment:
+        Variables:
+          TRACKS_TABLE: !Ref TracksTableName
+          CONFIG_TABLE: !Ref ConfigTableName
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref TracksTableName
+        - DynamoDBReadPolicy:
+            TableName: !Ref ConfigTableName
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:Query
+              Resource:
+                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${TracksTableName}/index/timestamp-index"
+
+  # --- Permission: Allow AgentCore to invoke the Lambda ---
+  McpToolsFunctionInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt McpToolsFunction.Arn
+      Action: lambda:InvokeFunction
+      Principal: bedrock-agentcore.amazonaws.com
+      SourceAccount: !Ref AWS::AccountId
+
+  # --- IAM Role: Gateway execution role ---
+  GatewayRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${GatewayName}-gateway-role"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: bedrock-agentcore.amazonaws.com
+            Action: sts:AssumeRole
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Ref AWS::AccountId
+      Policies:
+        - PolicyName: InvokeLambdaTarget
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - lambda:InvokeFunction
+                Resource:
+                  - !GetAtt McpToolsFunction.Arn
+
+  # --- AgentCore Gateway ---
+  McpGateway:
+    Type: AWS::BedrockAgentCore::Gateway
+    DependsOn: GatewayRole
+    Properties:
+      Name: !Ref GatewayName
+      Description: "Muddy's Top 10 song history and chart MCP gateway"
+      AuthorizerType: NONE
+      RoleArn: !GetAtt GatewayRole.Arn
+      ProtocolType: MCP
+
+  # --- AgentCore Gateway Target (Lambda + inline tool schema) ---
+  McpGatewayTarget:
+    Type: AWS::BedrockAgentCore::GatewayTarget
+    Properties:
+      GatewayIdentifier: !GetAtt McpGateway.GatewayIdentifier
+      Name: !Sub "${GatewayName}-target"
+      Description: "Lambda target exposing get_top10 and get_history tools"
+      CredentialProviderConfigurations:
+        - CredentialProviderType: GATEWAY_IAM_ROLE
+      TargetConfiguration:
+        Mcp:
+          Lambda:
+            LambdaArn: !GetAtt McpToolsFunction.Arn
+            ToolSchema:
+              InlinePayload:
+                - Name: get_top10
+                  Description: >
+                    Returns the current weekly Top 10 chart for Muddy's Music Cafe
+                    with play counts, movement indicators (up/down/same/new), previous
+                    rank, and chart period dates. The chart resets weekly based on a
+                    configured schedule in Pacific time.
+                  InputSchema:
+                    Type: object
+                    Description: No input parameters required
+                  OutputSchema:
+                    Type: object
+                    Description: Top 10 chart response
+                    Properties:
+                      top10:
+                        Type: array
+                        Description: Ranked list of top 10 tracks
+                        Items:
+                          Type: object
+                          Properties:
+                            rank:
+                              Type: integer
+                              Description: Chart position 1-10
+                            track:
+                              Type: string
+                              Description: "Track in 'Artist - Title' format"
+                            play_count:
+                              Type: integer
+                              Description: Plays this chart week
+                            previous_rank:
+                              Type: integer
+                              Description: Position last week (null if new)
+                            movement:
+                              Type: string
+                              Description: "Movement: up, down, same, or new"
+                            movement_delta:
+                              Type: integer
+                              Description: Positions moved (positive=up)
+                      chart_date:
+                        Type: string
+                        Description: Chart week start in ISO 8601 PST
+                      week_start:
+                        Type: string
+                        Description: Counting window start in ISO 8601 PST
+                      week_end:
+                        Type: string
+                        Description: Counting window end in ISO 8601 PST
+                - Name: get_history
+                  Description: >
+                    Returns the last 7 days of song play history from Muddy's Music
+                    Cafe radio stream, grouped into 2-hour blocks in Pacific Standard
+                    Time. Each block contains all tracks played during that period
+                    with timestamps, validation status, and parsed artist/title.
+                  InputSchema:
+                    Type: object
+                    Description: No input parameters required
+                  OutputSchema:
+                    Type: object
+                    Description: Track history response
+                    Properties:
+                      blocks:
+                        Type: array
+                        Description: 2-hour time blocks with played tracks
+                        Items:
+                          Type: object
+                          Properties:
+                            block_timestamp:
+                              Type: integer
+                              Description: Unix timestamp of block start
+                            block_label:
+                              Type: string
+                              Description: Human-readable label in PST
+                            tracks:
+                              Type: array
+                              Description: Tracks played in this block
+                              Items:
+                                Type: object
+                                Properties:
+                                  timestamp:
+                                    Type: integer
+                                    Description: Unix timestamp of detection
+                                  formatted_time:
+                                    Type: string
+                                    Description: ISO 8601 in PST
+                                  track:
+                                    Type: string
+                                    Description: Canonical or raw track name
+                                  raw_track:
+                                    Type: string
+                                    Description: Original stream detection
+                                  validation_status:
+                                    Type: string
+                                    Description: "validated, unvalidated, or promotional"
+                                  artist:
+                                    Type: string
+                                    Description: Parsed artist (if validated)
+                                  title:
+                                    Type: string
+                                    Description: Parsed title (if validated)
+                      total_tracks:
+                        Type: integer
+                        Description: Total tracks in the last 7 days
+                - Name: list_chart_weeks
+                  Description: >
+                    Lists available chart weeks that have track data, going back up
+                    to 12 weeks. Returns week IDs in YYYY-MM-DD format that can be
+                    used with the get_chart_week tool to retrieve historical Top 10
+                    charts. Use this to find what weeks are available before querying
+                    a specific past chart.
+                  InputSchema:
+                    Type: object
+                    Description: No input parameters required
+                  OutputSchema:
+                    Type: object
+                    Description: Available chart weeks
+                    Properties:
+                      weeks:
+                        Type: array
+                        Description: Available chart weeks with track data
+                        Items:
+                          Type: object
+                          Properties:
+                            week_id:
+                              Type: string
+                              Description: "Week identifier in YYYY-MM-DD, use with get_chart_week"
+                            week_start:
+                              Type: string
+                              Description: Chart week start in ISO 8601 PST
+                            week_end:
+                              Type: string
+                              Description: Chart week end in ISO 8601 PST
+                      count:
+                        Type: integer
+                        Description: Number of available weeks
+                - Name: get_chart_week
+                  Description: >
+                    Returns the Top 10 chart for a specific past week, identified
+                    by week_id in YYYY-MM-DD format. Computes rankings from raw
+                    play data including movement indicators compared to the prior
+                    week. Use list_chart_weeks first to see available weeks.
+                  InputSchema:
+                    Type: object
+                    Description: Parameters for retrieving a specific week chart
+                    Properties:
+                      week_id:
+                        Type: string
+                        Description: "Chart week date in YYYY-MM-DD (e.g. 2026-07-19)"
+                    Required:
+                      - week_id
+                  OutputSchema:
+                    Type: object
+                    Description: Top 10 chart for the specified week
+                    Properties:
+                      week_id:
+                        Type: string
+                        Description: The requested week ID
+                      top10:
+                        Type: array
+                        Description: Ranked top 10 tracks for that week
+                        Items:
+                          Type: object
+                          Properties:
+                            rank:
+                              Type: integer
+                              Description: Chart position 1-10
+                            track:
+                              Type: string
+                              Description: "Track in Artist - Title format"
+                            play_count:
+                              Type: integer
+                              Description: Plays during that chart week
+                            previous_rank:
+                              Type: integer
+                              Description: Position the week before (null if new)
+                            movement:
+                              Type: string
+                              Description: "up, down, same, or new"
+                            movement_delta:
+                              Type: integer
+                              Description: Positions moved
+                      week_start:
+                        Type: string
+                        Description: Chart week start in ISO 8601 PST
+                      week_end:
+                        Type: string
+                        Description: Chart week end in ISO 8601 PST
+                      summary:
+                        Type: object
+                        Description: Week summary statistics
+                        Properties:
+                          total_plays:
+                            Type: integer
+                            Description: Total filtered plays that week
+                          unique_tracks:
+                            Type: integer
+                            Description: Unique tracks played
+
+Outputs:
+  McpToolsFunctionArn:
+    Description: ARN of the MCP tools Lambda
+    Value: !GetAtt McpToolsFunction.Arn
+  GatewayId:
+    Description: AgentCore Gateway identifier
+    Value: !GetAtt McpGateway.GatewayIdentifier
+  GatewayArn:
+    Description: AgentCore Gateway ARN
+    Value: !GetAtt McpGateway.GatewayArn
+  GatewayUrl:
+    Description: AgentCore Gateway URL endpoint
+    Value: !GetAtt McpGateway.GatewayUrl
+  GatewayTargetId:
+    Description: Gateway Target identifier
+    Value: !GetAtt McpGatewayTarget.TargetId

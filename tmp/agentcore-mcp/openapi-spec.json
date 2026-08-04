@@ -1,0 +1,173 @@
+{
+  "openapi": "3.0.1",
+  "info": {
+    "title": "Muddy's Top 10 MCP Tools",
+    "description": "MCP tools for querying Muddy's Music Cafe song history and weekly Top 10 chart.",
+    "version": "1.0"
+  },
+  "paths": {
+    "/get_top10": {
+      "post": {
+        "operationId": "get_top10",
+        "summary": "Get the current Top 10 chart",
+        "description": "Returns the current weekly Top 10 tracks for Muddy's Music Cafe with play counts, movement indicators (up/down/same/new), and chart period dates. The chart resets weekly based on configured schedule.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {}
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Current Top 10 chart data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "top10": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "rank": {
+                            "type": "integer",
+                            "description": "Chart position (1-10)"
+                          },
+                          "track": {
+                            "type": "string",
+                            "description": "Track name in 'Artist - Title' format"
+                          },
+                          "play_count": {
+                            "type": "integer",
+                            "description": "Number of plays this chart week"
+                          },
+                          "previous_rank": {
+                            "type": "integer",
+                            "description": "Position in previous week's chart (null if new)"
+                          },
+                          "movement": {
+                            "type": "string",
+                            "enum": ["up", "down", "same", "new"],
+                            "description": "Movement direction compared to previous week"
+                          },
+                          "movement_delta": {
+                            "type": "integer",
+                            "description": "Number of positions moved (positive=up, null if new)"
+                          }
+                        }
+                      }
+                    },
+                    "chart_date": {
+                      "type": "string",
+                      "description": "Chart week start date in ISO 8601 PST"
+                    },
+                    "week_start": {
+                      "type": "string",
+                      "description": "Chart counting window start in ISO 8601 PST"
+                    },
+                    "week_end": {
+                      "type": "string",
+                      "description": "Chart counting window end in ISO 8601 PST"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/get_history": {
+      "post": {
+        "operationId": "get_history",
+        "summary": "Get song play history",
+        "description": "Returns the last 7 days of song play history from Muddy's Music Cafe stream, grouped into 2-hour blocks in Pacific Standard Time. Each block contains all tracks played during that period with timestamps and validation status.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {}
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Track history grouped by 2-hour blocks",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "blocks": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "block_timestamp": {
+                            "type": "integer",
+                            "description": "Unix timestamp of the 2-hour block start"
+                          },
+                          "block_label": {
+                            "type": "string",
+                            "description": "Human-readable block label in PST"
+                          },
+                          "tracks": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "timestamp": {
+                                  "type": "integer",
+                                  "description": "Unix timestamp when the track was detected"
+                                },
+                                "formatted_time": {
+                                  "type": "string",
+                                  "description": "ISO 8601 timestamp in PST"
+                                },
+                                "track": {
+                                  "type": "string",
+                                  "description": "Canonical track name (validated) or raw track name"
+                                },
+                                "raw_track": {
+                                  "type": "string",
+                                  "description": "Original track name as detected from stream"
+                                },
+                                "validation_status": {
+                                  "type": "string",
+                                  "description": "Track validation status: validated, unvalidated, or promotional"
+                                },
+                                "artist": {
+                                  "type": "string",
+                                  "description": "Parsed artist name (if validated)"
+                                },
+                                "title": {
+                                  "type": "string",
+                                  "description": "Parsed song title (if validated)"
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "total_tracks": {
+                      "type": "integer",
+                      "description": "Total number of tracks in the last 7 days"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
