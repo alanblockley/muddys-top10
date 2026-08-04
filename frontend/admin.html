@@ -2005,6 +2005,7 @@
 
             <div class="tabs">
                 <button class="tab-btn active" onclick="switchTab('history')">📜 History</button>
+                <button class="tab-btn" onclick="switchTab('top10')">🏆 Top 10</button>
                 <button class="tab-btn" onclick="switchTab('campaigns')">🧠 Campaigns</button>
                 <button class="tab-btn" onclick="switchTab('settings')">⚙️ Settings</button>
                 <button class="tab-btn" onclick="switchTab('rawdata')">📊 Raw Data</button>
@@ -2021,11 +2022,11 @@
                 </div>
             </div>
 
-            <div id="tab-filters" class="tab-content">
-            </div>
-
-            <div id="tab-chart" class="tab-content">
-            </div>
+            <div id="tab-top10" class="tab-content">
+                <div class="card">
+                    <h2 style="margin-bottom:15px;">Current Top 10</h2>
+                    <div id="top10Content"><p style="color:#94a3b8;">Loading chart...</p></div>
+                </div>
             </div>
 
             <div id="tab-rawdata" class="tab-content">
@@ -2458,12 +2459,54 @@
                 loadSpotifyStatus();
             }
 
+            // Load Top 10 if switching to that tab
+            if (tabName === 'top10') {
+                loadTop10();
+            }
+
             // Load campaign drafts if switching to campaigns tab
             if (tabName === 'campaigns' && !window.campaignsLoaded) {
                 refreshCampaignManagement();
             }
             if (tabName !== 'campaigns') {
                 stopCampaignRefreshPolling();
+            }
+        }
+
+        async function loadTop10() {
+            const container = document.getElementById('top10Content');
+            if (!container) return;
+            try {
+                const response = await fetch(`${CONFIG.apiEndpoint}/top10`, {
+                    headers: { 'Authorization': accessToken }
+                });
+                const data = await response.json();
+                const tracks = data.top10 || [];
+                if (!tracks.length) {
+                    container.innerHTML = '<p style="color:#94a3b8;">No chart data available yet.</p>';
+                    return;
+                }
+                container.innerHTML = `
+                    <p style="color:#64748b;margin-bottom:12px;">${data.week_start ? `Chart week: ${data.week_start} – ${data.week_end}` : ''}</p>
+                    <table style="width:100%;border-collapse:collapse;">
+                        <thead><tr style="color:#a78bfa;font-size:0.85em;text-align:left;border-bottom:1px solid #334155;">
+                            <th style="padding:6px 8px;width:40px;">#</th>
+                            <th style="padding:6px 8px;">Track</th>
+                            <th style="padding:6px 8px;width:60px;">Plays</th>
+                            <th style="padding:6px 8px;width:80px;">Movement</th>
+                        </tr></thead>
+                        <tbody>${tracks.map(t => `
+                            <tr style="border-bottom:1px solid #1e293b;">
+                                <td style="padding:6px 8px;font-weight:700;color:#a78bfa;">${t.rank}</td>
+                                <td style="padding:6px 8px;color:#e2e8f0;">${escapeHtml(t.track)}</td>
+                                <td style="padding:6px 8px;color:#facc15;font-weight:700;">${t.play_count}</td>
+                                <td style="padding:6px 8px;color:${t.movement === 'up' ? '#22c55e' : t.movement === 'down' ? '#ef4444' : t.movement === 'new' ? '#facc15' : '#94a3b8'};">${t.movement === 'up' ? '▲' : t.movement === 'down' ? '▼' : t.movement === 'new' ? '★' : '—'} ${t.movement_delta ? (t.movement_delta > 0 ? '+' + t.movement_delta : t.movement_delta) : ''}</td>
+                            </tr>
+                        `).join('')}</tbody>
+                    </table>
+                `;
+            } catch (e) {
+                container.innerHTML = `<p style="color:#ef4444;">Failed to load Top 10: ${escapeHtml(e.message)}</p>`;
             }
         }
 
