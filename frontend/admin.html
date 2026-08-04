@@ -517,6 +517,67 @@
             font-weight: 700;
         }
 
+        .campaign-modal-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid #1e293b;
+            margin-bottom: 16px;
+        }
+        .campaign-modal-header h3 {
+            color: #e4e8f0;
+            font-size: 1.1rem;
+            margin: 0;
+        }
+
+        .campaign-split-layout {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            min-height: 400px;
+        }
+        .campaign-left {
+            display: flex;
+            flex-direction: column;
+        }
+        .campaign-right {
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+            max-height: 600px;
+        }
+
+        .campaign-content-tabs {
+            display: flex;
+            gap: 0;
+            border-bottom: 1px solid #334155;
+            margin-bottom: 12px;
+        }
+        .campaign-content-tab {
+            padding: 8px 16px;
+            border: none;
+            background: transparent;
+            color: #94a3b8;
+            font-size: 0.9em;
+            font-weight: 600;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+        }
+        .campaign-content-tab.active {
+            color: #a78bfa;
+            border-bottom-color: #a78bfa;
+        }
+        .campaign-content-tab:hover:not(.active) {
+            color: #e2e8f0;
+        }
+        .campaign-content-panel {
+            display: none;
+        }
+        .campaign-content-panel.active {
+            display: block;
+        }
+
         .campaign-asset-frame {
             width: 100%;
             aspect-ratio: 16 / 9;
@@ -3022,6 +3083,15 @@
             }
         }
 
+        function switchCampaignContentTab(event, tabId) {
+            const container = event.target.closest('.campaign-right');
+            container.querySelectorAll('.campaign-content-tab').forEach(t => t.classList.remove('active'));
+            container.querySelectorAll('.campaign-content-panel').forEach(p => p.classList.remove('active'));
+            event.target.classList.add('active');
+            const panel = container.querySelector(`#campaignTab${tabId.charAt(0).toUpperCase() + tabId.slice(1)}`);
+            if (panel) panel.classList.add('active');
+        }
+
         function renderCampaignDetail(campaign) {
             if (!campaign) {
                 document.getElementById('campaignModalContent').innerHTML = '<div style="color: #94a3b8;">Campaign not found.</div>';
@@ -3031,89 +3101,46 @@
             selectedCampaignWeekId = campaign.week_id;
             window.currentCampaign = campaign;
             const status = escapeHtml(campaign.status || 'draft');
-            const chartTracks = ((campaign.chart_brief || {}).tracks || []).slice(0, 10);
 
             document.getElementById('campaignModalContent').innerHTML = `
-                <div style="display: flex; justify-content: space-between; gap: 15px; align-items: flex-start; margin-bottom: 15px;">
-                    <div>
-                        <h3 id="campaignModalTitle" style="color: #e4e8f0; margin-bottom: 8px;">Week ${escapeHtml(campaign.week_id)}</h3>
-                        <div class="campaign-meta">
-                            <span class="status-pill status-${status}">${status}</span>
-                            Generated ${escapeHtml(formatCampaignDate(campaign.generated_at))} by ${escapeHtml(campaign.generated_by || 'unknown')}
-                            ${campaignProgressText(campaign) ? `<span class="campaign-progress-label">${escapeHtml(campaignProgressText(campaign))}</span>` : ''}
+                <div class="campaign-modal-header">
+                    <h3>Week ${escapeHtml(campaign.week_id)}</h3>
+                    <span class="status-pill status-${status}">${status}</span>
+                    <span style="color:#64748b;font-size:0.85em;">Generated ${escapeHtml(formatCampaignDate(campaign.generated_at))}</span>
+                    <div style="margin-left:auto;display:flex;gap:8px;">
+                        <button onclick="regenerateCampaign('${escapeHtml(campaign.week_id)}')" class="btn" style="background:linear-gradient(135deg,#a855f7,#6d28d9);padding:8px 14px;font-size:0.85rem;">🔄 Regenerate</button>
+                        <button onclick="deleteSelectedCampaign()" class="btn btn-secondary" style="padding:8px 14px;font-size:0.85rem;background:#991b1b;">Delete</button>
+                    </div>
+                </div>
+
+                <div class="campaign-split-layout">
+                    <div class="campaign-left">
+                        ${renderInfographicAssetPanel(campaign)}
+                        <div id="campaignFeedbackPanel" style="margin-top:12px;">
+                            <p class="help-text">Loading feedback...</p>
                         </div>
                     </div>
-                    <button onclick="loadCampaign('${escapeHtml(campaign.week_id)}')" class="btn btn-secondary">Reload</button>
-                </div>
-
-                <div class="campaign-actions">
-                    <button onclick="regenerateCampaign('${escapeHtml(campaign.week_id)}')" class="btn" style="background: linear-gradient(135deg, #a855f7, #6d28d9);">🔄 Regenerate</button>
-                    <button onclick="updateCampaignStatus('draft')" class="btn btn-secondary">Mark Draft</button>
-                    <button onclick="updateCampaignStatus('reviewed')" class="btn btn-secondary">Mark Reviewed</button>
-                    <button onclick="updateCampaignStatus('approved')" class="btn btn-secondary">Approve</button>
-                    <button onclick="updateCampaignStatus('published')" class="btn btn-secondary">Mark Published</button>
-                    <button onclick="loadCampaignDiagnostics()" class="btn btn-secondary">Inspect Failure Logs</button>
-                    <button onclick="deleteSelectedCampaign()" class="btn btn-secondary" style="background: linear-gradient(135deg, #dc2626, #991b1b);">Delete Campaign</button>
-                </div>
-
-                <div id="campaignDiagnosticsPanel"></div>
-
-                <div id="campaignRevisionPanel" class="preview-block">
-                    <h4>Campaign Revisions</h4>
-                    <p class="help-text">Loading revision history...</p>
-                </div>
-
-                <div id="campaignFeedbackPanel" class="preview-block">
-                    <h4>Review Feedback</h4>
-                    <p class="help-text">Loading feedback for the active revision...</p>
-                </div>
-
-                <div class="campaign-preview">
-                    ${renderInfographicValidation(campaign.infographic_asset_validation)}
-                    ${renderInfographicAssetPanel(campaign)}
-                    ${renderSocialPreview(campaign.social)}
-                    ${renderRadioPreview(campaign.radio_reads)}
-                </div>
-
-                <details class="campaign-source-reference">
-                    <summary>Source / Reference Data</summary>
-                    <p class="help-text">
-                        These sections explain what the campaign was generated from. They are reference data, not primary campaign assets.
-                    </p>
-                    ${renderChartPreview(chartTracks)}
-                    ${renderInfographicPreview(campaign.infographic)}
-
-                    <h3 style="margin: 20px 0 12px; color: #a5b4fc;">Campaign JSON Sections</h3>
-                    <p class="help-text" style="margin-bottom: 15px;">
-                        Generated content is immutable. Save only updates review notes; regenerate the campaign to create a new content snapshot.
-                    </p>
-
-                    <div class="campaign-editors">
-                        <div>
-                            <label for="campaignRadioReads">Radio Reads (read-only)</label>
-                            <textarea id="campaignRadioReads" class="campaign-editor" readonly>${escapeHtml(JSON.stringify(campaign.radio_reads || {}, null, 2))}</textarea>
+                    <div class="campaign-right">
+                        <div class="campaign-content-tabs">
+                            <button class="campaign-content-tab active" onclick="switchCampaignContentTab(event,'radio')">Radio Reads</button>
+                            <button class="campaign-content-tab" onclick="switchCampaignContentTab(event,'social')">Social Posts</button>
+                            <button class="campaign-content-tab" onclick="switchCampaignContentTab(event,'details')">Details</button>
                         </div>
-                        <div>
-                            <label for="campaignInfographic">Infographic (read-only)</label>
-                            <textarea id="campaignInfographic" class="campaign-editor" readonly>${escapeHtml(JSON.stringify(campaign.infographic || {}, null, 2))}</textarea>
+                        <div class="campaign-content-panel active" id="campaignTabRadio">
+                            ${renderRadioPreview(campaign.radio_reads)}
                         </div>
-                        <div>
-                            <label for="campaignSocial">Social (read-only)</label>
-                            <textarea id="campaignSocial" class="campaign-editor" readonly>${escapeHtml(JSON.stringify(campaign.social || {}, null, 2))}</textarea>
+                        <div class="campaign-content-panel" id="campaignTabSocial">
+                            ${renderSocialPreview(campaign.social)}
                         </div>
-                        <div>
-                            <label for="campaignReview">Review Notes</label>
-                            <textarea id="campaignReview" class="campaign-editor">${escapeHtml(JSON.stringify(campaign.review || {}, null, 2))}</textarea>
+                        <div class="campaign-content-panel" id="campaignTabDetails">
+                            <div id="campaignRevisionPanel" class="preview-block">
+                                <h4>Revisions</h4>
+                                <p class="help-text">Loading...</p>
+                            </div>
+                            ${campaignProgressText(campaign) ? `<div class="preview-block"><h4>Progress</h4><p>${escapeHtml(campaignProgressText(campaign))}</p></div>` : ''}
                         </div>
                     </div>
-                </details>
-
-                <div class="campaign-actions">
-                    <button onclick="saveCampaignContent()" class="btn">Save Review Notes</button>
-                    <button onclick="toggleCampaignJson()" class="btn btn-secondary">Toggle Full JSON</button>
                 </div>
-
-                <pre id="campaignFullJson" style="display: none; background: #141b2d; border: 1px solid #1e293b; border-radius: 8px; padding: 15px; color: #94a3b8; overflow-x: auto; white-space: pre-wrap;">${escapeHtml(JSON.stringify(campaign, null, 2))}</pre>
             `;
             loadCampaignRevisions(campaign.week_id);
             loadCampaignFeedback(campaign.week_id, campaign.active_revision_id);
