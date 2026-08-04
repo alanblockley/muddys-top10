@@ -22,7 +22,6 @@ from common import (
 )
 from campaign_generation import (
     BedrockCampaignModel,
-    generate_infographic_asset,
     generate_infographic_content,
     normalize_campaign_branding,
     utc_now_iso,
@@ -714,60 +713,9 @@ def put_campaign_logo(event):
 
 
 def post_infographic_template_reference(event):
-    try:
-        bucket = os.environ.get('CAMPAIGN_ASSETS_BUCKET')
-        function_name = os.environ.get('INFOGRAPHIC_RENDERER_FUNCTION_NAME')
-        if not bucket:
-            raise RuntimeError('CAMPAIGN_ASSETS_BUCKET is not configured')
-        if not function_name:
-            raise RuntimeError('INFOGRAPHIC_RENDERER_FUNCTION_NAME is not configured')
-
-        branding = normalize_campaign_branding(get_config_value('campaign_branding'))
-        template_config = normalize_template_config(get_config_value('campaign_infographic_template'))
-        template = resolve_template(template_config, s3_client=s3_client, bucket=bucket)
-        chart_brief = template_reference_chart_brief()
-        venue_config = venue_config_with_branding(branding)
-        infographic = template_reference_infographic_content(chart_brief, venue_config)
-        asset = generate_infographic_asset(chart_brief, infographic, venue_config, template)
-        asset['metadata']['asset_role'] = 'template_reference'
-        asset['metadata']['reference_intent'] = 'blank_structure_with_placeholders'
-
-        response = lambda_client.invoke(
-            FunctionName=function_name,
-            InvocationType='RequestResponse',
-            Payload=json.dumps({
-                'week_id': 'template-reference',
-                'infographic_asset': asset,
-                'output_prefix': f"templates/{template_config['template_id']}/v{template_config['version']}",
-                'filename_prefix': 'reference'
-            }).encode('utf-8')
-        )
-        raw_payload = response.get('Payload').read().decode('utf-8')
-        result = json.loads(raw_payload or '{}')
-        if response.get('FunctionError'):
-            raise RuntimeError(result.get('errorMessage') or raw_payload or 'Infographic renderer failed')
-        if not result.get('ok') or not result.get('infographic_png'):
-            raise RuntimeError(result.get('error') or 'Infographic renderer did not return reference PNG metadata')
-
-        rendered = result['infographic_png']
-        updated_template = {
-            **template_config,
-            'reference_png_key': rendered['key'],
-            'reference_png_generated_at': rendered.get('generated_at') or utc_now_iso()
-        }
-        updated_template = normalize_template_config(updated_template)
-        config_table.put_item(Item={
-            'configKey': 'campaign_infographic_template',
-            'value': updated_template
-        })
-
-        return api_response(200, {
-            'campaign_infographic_template': enrich_infographic_template_reference_url(updated_template),
-            'reference_png': rendered
-        })
-    except Exception as e:
-        print(f"Error generating infographic template reference: {e}")
-        return api_response(500, {'error': str(e)})
+    return api_response(200, {
+        'message': 'Template reference preview is now managed via template upload. Use the uploaded PNG as the reference.'
+    })
 
 
 def template_reference_chart_brief():
