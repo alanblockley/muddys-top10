@@ -39,10 +39,18 @@
 ### Frontend Deployment
 
 Frontend files are deployed automatically as part of `deploy.sh`:
-1. S3 upload of `frontend/` contents
-2. CloudFront cache invalidation
+1. Generate `config.js` with the current API endpoint and inject admin/Cognito settings
+2. Upload `index.html`, `config.js`, `admin.html`, `data-viewer.html`, and frontend assets to S3
+3. Invalidate the CloudFront cache
 
 No separate frontend deploy step is needed.
+
+The root `index.html` is a public welcome page that shows the latest published
+chart PNG (only campaigns with Published status are shown). The page also
+includes a PNG download link and a Resources section. The authenticated admin
+interface is served from `/admin.html`.
+
+> **Note:** The word "campaign" is not used on public-facing pages — it is an internal-only term.
 
 ---
 
@@ -113,6 +121,29 @@ docs/
 ├── agentic/context/         # AI steering context files
 └── *.md                     # Documentation
 ```
+
+---
+
+## API Endpoints — Resources
+
+| Method | Path | Auth | Purpose |
+|--------|------|------|---------|
+| `GET` | `/api/resources` | Public (no auth) | List all resources with metadata |
+| `POST` | `/api/resources` | Cognito (admin) | Upload a new resource |
+| `DELETE` | `/api/resources/{id}` | Cognito (admin) | Delete a resource |
+
+---
+
+## S3 Bucket Structure
+
+| Prefix | Contents |
+|--------|----------|
+| `frontend/` | Static site files (index.html, admin.html, config.js) |
+| `campaigns/` | Generated infographic PNGs |
+| `resources/` | Uploaded station resources (opus, mp3, pdf) |
+| `logos/` | Branding logo uploads |
+
+The SAM template grants the API function `s3:GetObject`, `s3:PutObject`, and `s3:DeleteObject` permissions on the `resources/*` prefix.
 
 ---
 

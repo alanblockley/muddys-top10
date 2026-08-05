@@ -24,6 +24,7 @@ LAMBDA_ARCHITECTURE_OVERRIDE=""
 FRONTEND_DIR="frontend"
 FRONTEND_SOURCE="$FRONTEND_DIR/index.html"
 FRONTEND_BUILD="$FRONTEND_DIR/index-configured.html"
+FRONTEND_CONFIG_BUILD="$FRONTEND_DIR/config.js"
 ADMIN_SOURCE="$FRONTEND_DIR/admin.html"
 ADMIN_BUILD="$FRONTEND_DIR/admin-configured.html"
 DATA_VIEWER_SOURCE="$FRONTEND_DIR/data-viewer.html"
@@ -1029,9 +1030,16 @@ if [ ! -f "$FRONTEND_SOURCE" ]; then
     exit 1
 fi
 
+cat > "$FRONTEND_CONFIG_BUILD" <<EOF
+window.MUDDYS_CONFIG = {
+  apiBase: "$API_URL"
+};
+EOF
+echo "✅ frontend config.js generated"
+
 # Configure admin.html if Cognito is configured
 if [ -f "$ADMIN_SOURCE" ] && [ -n "$USER_POOL_ID" ] && [ "$USER_POOL_ID" != "None" ]; then
-    echo "Configuring index.html with Cognito..."
+    echo "Configuring public index.html..."
     sed -e "s|%%API_ENDPOINT%%|$API_URL|g" \
         -e "s|%%USER_POOL_ID%%|$USER_POOL_ID|g" \
         -e "s|%%CLIENT_ID%%|$CLIENT_ID|g" \
@@ -1071,6 +1079,11 @@ aws s3 cp "$FRONTEND_BUILD" "s3://$BUCKET_NAME/index.html" \
     --content-type "text/html" \
     --cache-control "max-age=300"
 echo "✅ index.html uploaded"
+
+aws s3 cp "$FRONTEND_CONFIG_BUILD" "s3://$BUCKET_NAME/config.js" \
+    --content-type "application/javascript" \
+    --cache-control "no-store, max-age=0"
+echo "✅ config.js uploaded"
 
 # Upload admin.html if configured
 if [ -f "$ADMIN_BUILD" ]; then
@@ -1163,6 +1176,7 @@ echo ""
 
 # Cleanup
 rm -f "$FRONTEND_BUILD"
+rm -f "$FRONTEND_CONFIG_BUILD"
 rm -f "$ADMIN_BUILD" "$DATA_VIEWER_BUILD"
 
 # Final summary

@@ -50,15 +50,16 @@ Serverless AWS application that monitors a Shoutcast internet radio stream, trac
                                             │  4.6)            │  │ (Node.js 20.x)  │
 ┌───────────────────────────────────────┐   └──────────────────┘  └────────┬────────┘
 │  API Gateway + Cognito                │                                  │
-│  (REST API, 26+ routes)              │                                  ▼
+│  (REST API, 29+ routes)              │                                  ▼
 └───────────────┬───────────────────────┘                       ┌─────────────────┐
                 │                                               │ S3 Bucket       │
-                ▼                                               │ (PNG assets)    │
+                ▼                                               │ (PNG + resources)│
 ┌───────────────────────────────────┐                           └─────────────────┘
 │  ApiFunction (Python 3.14)        │
 │  ├── /api/top10                   │
 │  ├── /api/top10/history           │
 │  ├── /api/campaigns               │
+│  ├── /api/resources               │
 │  ├── /api/history                 │
 │  ├── /api/config                  │
 │  └── /api/health                  │
@@ -82,7 +83,7 @@ Serverless AWS application that monitors a Shoutcast internet radio stream, trac
 |---|----------|---------|---------|---------|
 | 1 | StreamPollerFunction | Python 3.14 | EventBridge (1min) | Polls Shoutcast stream, writes new tracks to DynamoDB |
 | 2 | TrackValidatorFunction | Python 3.14 | DynamoDB Streams (NEW_IMAGE) | Validates tracks against MusicBrainz/Spotify, canonicalizes names |
-| 3 | ApiFunction | Python 3.14 | API Gateway | REST API with Cognito auth, 26+ routes for chart/history/campaigns/config |
+| 3 | ApiFunction | Python 3.14 | API Gateway | REST API with Cognito auth, 29+ routes for chart/history/campaigns/resources/config |
 | 4 | CampaignGeneratorFunction | Python 3.14 | EventBridge (weekly) / API | Invokes AgentCore Runtime to orchestrate campaign generation |
 | 5 | InfographicRendererFunction | Node.js 20.x | Lambda invoke | Renders HTML/CSS chart poster to 1280x720 PNG via Playwright |
 | 6 | PlaylistGeneratorFunction | Python 3.14 | EventBridge (weekly) | Generates Spotify playlist, persists weekly chart snapshot to ChartHistory |
@@ -105,7 +106,23 @@ Serverless AWS application that monitors a Shoutcast internet radio stream, trac
 - **API Gateway**: REST API with Cognito authorizer
 - **Cognito User Pool**: JWT-based authentication for all API and frontend access
 - **CloudFront**: HTTPS CDN with OAC for S3 origin
-- **S3**: Static frontend hosting + campaign asset storage (infographic PNGs)
+- **S3**: Static frontend hosting + campaign asset storage (infographic PNGs) + resource files (`resources/*` prefix)
+
+### Campaign Status Workflow
+
+Campaigns progress through a defined lifecycle:
+
+```
+Draft → Reviewed → Approved → Published
+```
+
+Only campaigns with **Published** status are served on the public endpoint. The public API filters by status to ensure draft/reviewed/approved content remains admin-only.
+
+### Resources Storage
+
+- **Metadata**: Stored in the Config table (category, description, filename, S3 key)
+- **Files**: Stored in S3 under the `resources/` prefix (opus, mp3, pdf)
+- **Public access**: `GET /api/resources` is unauthenticated; `POST` and `DELETE` require Cognito auth
 
 ### AI & Agent Infrastructure
 

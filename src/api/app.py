@@ -1447,6 +1447,57 @@ def campaign_get(event):
         return api_response(500, {'error': str(e)})
 
 
+def public_latest_campaign(event):
+    """Return the latest published campaign PNG metadata only."""
+    try:
+        query_args = {
+            'KeyConditionExpression': Key('pk').eq('CAMPAIGN'),
+            'ScanIndexForward': False,
+            'Limit': 50
+        }
+        while True:
+            response = campaigns_table.query(**query_args)
+            for campaign in response.get('Items', []):
+                if campaign.get('status') != 'published':
+                    continue
+                png = campaign.get('infographic_png')
+                if not isinstance(png, dict) or not png.get('bucket') or not png.get('key'):
+                    continue
+                enriched = enrich_campaign_asset_urls(campaign)
+                public_png = enriched.get('infographic_png') or {}
+                if not public_png.get('url'):
+                    continue
+                return api_response(200, {
+                    'campaign': {
+                        'week_id': enriched.get('week_id'),
+                        'status': enriched.get('status'),
+                        'generated_at': enriched.get('generated_at'),
+                        'published_at': enriched.get('published_at'),
+                        'infographic_png': {
+                            'url': public_png.get('url'),
+                            'content_type': public_png.get('content_type', 'image/png'),
+                            'size_bytes': public_png.get('size_bytes'),
+                            'width': public_png.get('width'),
+                            'height': public_png.get('height')
+                        }
+                    }
+                })
+
+            last_key = response.get('LastEvaluatedKey')
+            if not last_key:
+                break
+            query_args['ExclusiveStartKey'] = last_key
+
+        return api_response(200, {
+            'campaign': None,
+            'available': False,
+            'message': 'No published Top 10 chart is available yet'
+        })
+    except Exception as e:
+        print(f"Error getting public latest campaign: {e}")
+        return api_response(500, {'error': str(e)})
+
+
 def campaign_diagnostics(event):
     try:
         week_id = get_campaign_week_id_from_event(event)
@@ -2087,6 +2138,189 @@ def enrich_campaign_asset_urls(campaign):
     return enriched
 
 
+# ---------------------------------------------------------------------------
+# Resources (downloadable files grouped by category)
+# ---------------------------------------------------------------------------
+
+RESOURCE_CATEGORIES = ['Jingle', 'Sting', 'Ad', 'Read', 'Promo', 'Imaging', 'Other']
+RESOURCE_ALLOWED_TYPES = {
+    'audio/ogg': 'opus',
+    'audio/opus': 'opus',
+    'audio/mpeg': 'mp3',
+    'audio/mp3': 'mp3',
+    'application/pdf': 'pdf',
+}
+RESOURCE_MAX_SIZE_BYTES = 50 * 1024 * 1024  # 50 MB
+
+
+def list_resources(event):
+    """Public: list all resources grouped by category."""
+    try:
+        resources = get_config_value('resources') or []
+        bucket = os.environ.get('CAMPAIGN_ASSETS_BUCKET')
+        enriched = []
+        for r in resources:
+            item = dict(r)
+            if bucket and r.get('s3_key'):
+                try:
+                    item['url'] = s3_client.generate_presigned_url(
+                        'get_object',
+                        Params={
+                            'Bucket': bucket,
+                            'Key': r['s3_key'],
+                            'ResponseContentDisposition': f'attachment; filename="{r.get("filename", "download")}"',
+                            'ResponseContentType': r.get('content_type', 'application/octet-stream'),
+                        },
+                        ExpiresIn=3600,
+                    )
+                except Exception as e:
+                    print(f"Error generating resource URL for {r.get('s3_key')}: {e}")
+                    item['url'] = None
+            enriched.append(item)
+        return api_response(200, {'resources': enriched})
+    except Exception as e:
+        print(f"Error listing resources: {e}")
+        return api_response(500, {'error': str(e)})
+
+
+def create_resource(event):
+    """Admin: presign upload URL or register resource after upload."""
+    try:
+        body = parse_json_body(event)
+        action = str(body.get('action') or 'presign').strip()
+
+        if action == 'presign':
+            filename = str(body.get('filename') or '').strip()
+            content_type = str(body.get('content_type') or '').lower().strip()
+            category = str(body.get('category') or '').strip()
+            description = str(body.get('description') or '').strip()
+
+            if not filename:
+                return api_response(400, {'error': 'filename is required'})
+            if content_type not in RESOURCE_ALLOWED_TYPES:
+                return api_response(400, {
+                    'error': f'File type not allowed. Accepted: opus, mp3, pdf',
+                    'allowed_types': list(RESOURCE_ALLOWED_TYPES.keys())
+                })
+            if category and category not in RESOURCE_CATEGORIES:
+                return api_response(400, {
+                    'error': f'Invalid category. Allowed: {", ".join(RESOURCE_CATEGORIES)}',
+                })
+
+            bucket = os.environ.get('CAMPAIGN_ASSETS_BUCKET')
+            if not bucket:
+                raise RuntimeError('CAMPAIGN_ASSETS_BUCKET is not configured')
+
+            ext = RESOURCE_ALLOWED_TYPES[content_type]
+            safe_name = re.sub(r'[^A-Za-z0-9_.-]', '-', filename.rsplit('.', 1)[0] if '.' in filename else filename).strip('-') or 'resource'
+            resource_id = secrets.token_urlsafe(8)
+            key = f'resources/{resource_id}-{safe_name}.{ext}'
+
+            presigned_url = s3_client.generate_presigned_url(
+                'put_object',
+                Params={
+                    'Bucket': bucket,
+                    'Key': key,
+                    'ContentType': content_type,
+                },
+                ExpiresIn=600,
+            )
+
+            return api_response(200, {
+                'upload_url': presigned_url,
+                's3_key': key,
+                'resource_id': resource_id,
+                'bucket': bucket,
+                'content_type': content_type,
+                'expires_in': 600,
+            })
+
+        elif action == 'register':
+            resource_id = str(body.get('resource_id') or '').strip()
+            s3_key = str(body.get('s3_key') or '').strip()
+            filename = str(body.get('filename') or '').strip()
+            content_type = str(body.get('content_type') or '').strip()
+            category = str(body.get('category') or '').strip()
+            description = str(body.get('description') or '').strip()
+            metadata = body.get('metadata') if isinstance(body.get('metadata'), dict) else {}
+
+            if not resource_id or not s3_key:
+                return api_response(400, {'error': 'resource_id and s3_key are required for registration'})
+            if category not in RESOURCE_CATEGORIES:
+                return api_response(400, {'error': f'Invalid category. Allowed: {", ".join(RESOURCE_CATEGORIES)}'})
+            if not description:
+                return api_response(400, {'error': 'description is required'})
+
+            # Verify file exists in S3
+            bucket = os.environ.get('CAMPAIGN_ASSETS_BUCKET')
+            try:
+                head = s3_client.head_object(Bucket=bucket, Key=s3_key)
+                size_bytes = head.get('ContentLength', 0)
+            except Exception:
+                return api_response(400, {'error': 'Upload not found in S3. Please upload the file first.'})
+
+            if size_bytes > RESOURCE_MAX_SIZE_BYTES:
+                return api_response(400, {'error': f'File exceeds maximum size of {RESOURCE_MAX_SIZE_BYTES // (1024*1024)} MB'})
+
+            resources = get_config_value('resources') or []
+            new_resource = {
+                'id': resource_id,
+                'filename': filename,
+                's3_key': s3_key,
+                'content_type': content_type,
+                'category': category,
+                'description': description,
+                'metadata': metadata,
+                'size_bytes': int(size_bytes),
+                'uploaded_at': utc_now_iso(),
+                'uploaded_by': request_actor(event),
+            }
+            resources.append(new_resource)
+            config_table.put_item(Item={'configKey': 'resources', 'value': resources})
+
+            return api_response(200, {'resource': new_resource, 'message': 'Resource registered successfully'})
+
+        else:
+            return api_response(400, {'error': f'Unknown action: {action}. Use presign or register.'})
+
+    except ValueError as e:
+        return api_response(400, {'error': str(e)})
+    except Exception as e:
+        print(f"Error creating resource: {e}")
+        return api_response(500, {'error': str(e)})
+
+
+def delete_resource(event):
+    """Admin: delete a resource by ID."""
+    try:
+        path = event.get('path', '')
+        resource_id = path.split('/')[-1]
+        if not resource_id:
+            return api_response(400, {'error': 'Resource ID is required'})
+
+        resources = get_config_value('resources') or []
+        target = next((r for r in resources if r.get('id') == resource_id), None)
+        if not target:
+            return api_response(404, {'error': 'Resource not found'})
+
+        # Delete from S3
+        bucket = os.environ.get('CAMPAIGN_ASSETS_BUCKET')
+        if bucket and target.get('s3_key'):
+            try:
+                s3_client.delete_object(Bucket=bucket, Key=target['s3_key'])
+            except Exception as e:
+                print(f"Warning: failed to delete S3 object {target['s3_key']}: {e}")
+
+        # Remove from config
+        updated = [r for r in resources if r.get('id') != resource_id]
+        config_table.put_item(Item={'configKey': 'resources', 'value': updated})
+
+        return api_response(200, {'message': 'Resource deleted', 'deleted_id': resource_id})
+    except Exception as e:
+        print(f"Error deleting resource: {e}")
+        return api_response(500, {'error': str(e)})
+
+
 def lambda_handler(event, context):
     """Main Lambda handler"""
     print(f"Event: {json.dumps(event)}")
@@ -2128,6 +2362,14 @@ def lambda_handler(event, context):
             return spotify_generate_playlist(event)
         elif path == '/api/spotify/disconnect' and method == 'POST':
             return spotify_disconnect(event)
+        elif path == '/api/public/latest-campaign' and method == 'GET':
+            return public_latest_campaign(event)
+        elif path == '/api/resources' and method == 'GET':
+            return list_resources(event)
+        elif path == '/api/resources' and method == 'POST':
+            return create_resource(event)
+        elif path.startswith('/api/resources/') and method == 'DELETE':
+            return delete_resource(event)
         elif path == '/api/campaigns' and method == 'GET':
             return campaign_list(event)
         elif path == '/api/campaigns/generate' and method == 'POST':

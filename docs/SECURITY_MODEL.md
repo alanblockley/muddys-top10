@@ -1,13 +1,14 @@
 # Security Model
 
-## Authenticated Access
+## Public Access
 
-### Main Site (/)
+### Welcome Page (/)
 - **URL**: `https://your-cloudfront-url/`
-- **Content**: Cognito sign-in gate followed by the Top 10 chart
-- **Authentication required**
-- Shows weekly Top 10 with movement indicators after login
-- Updates automatically based on configured chart time
+- **Content**: latest approved or published campaign PNG
+- **Authentication not required**
+- Reads only `GET /api/public/latest-campaign`, which returns public PNG metadata and a short-lived presigned image URL
+
+## Authenticated Access
 
 ### Admin Panel (/admin.html)
 - **URL**: `https://your-cloudfront-url/admin.html`
@@ -34,6 +35,9 @@
 - `POST /api/campaigns/generate` - Human-triggered campaign generation/regeneration
 - `PUT /api/campaigns/{week_id}` - Edits generated campaign content
 - `PUT /api/campaigns/{week_id}/status` - Updates review/approval/published status
+
+### Public API Endpoints
+- `GET /api/public/latest-campaign` - Latest approved or published campaign PNG metadata only
 
 ### Technical Callback Endpoint
 - `GET /api/spotify/callback` remains externally reachable so Spotify can complete OAuth.
@@ -121,8 +125,8 @@ See [COGNITO_SETUP.md](COGNITO_SETUP.md) for full user management guide.
 ## Implementation Details
 
 ### Frontend
-- **index.html**: Login gate plus authenticated Top 10 view
-- **admin.html**: Full admin interface with three tabs
+- **index.html**: Public welcome page with latest approved or published campaign PNG
+- **admin.html**: Full authenticated admin interface
 
 ### API Lambda
 - API Gateway handles Cognito authorization before requests reach the Lambda

@@ -13,6 +13,7 @@ A serverless AWS application that monitors [Muddy's Music Cafe](http://muddys.di
 - 📊 Computes weekly Top 10 with movement indicators
 - 🧠 Generates campaign assets using Claude Sonnet (radio reads, social posts, infographic PNG)
 - 📥 Renders 1280×720 branded infographic from chart data
+- 🌐 Publishes a public welcome page with the latest approved or published campaign PNG
 - 🔄 Feedback loop: reviewer preferences shape future generations via AgentCore Memory
 
 ## Architecture
@@ -83,7 +84,7 @@ src/
 ├── playlist-generator/  # Spotify integration
 └── schedule-updater/    # EventBridge schedule sync
 layers/common/           # Shared Python modules
-frontend/                # Admin UI (HTML/JS)
+frontend/                # Public welcome page + admin UI (HTML/JS)
 docs/                    # Documentation
 docs/agentic/context/    # AI steering context files
 ```

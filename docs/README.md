@@ -7,6 +7,7 @@
 | [ARCHITECTURE.md](ARCHITECTURE.md) | System architecture, component diagram, data flows |
 | [TECHNICAL.md](TECHNICAL.md) | Deployment, configuration, project structure, monitoring |
 | [USER_GUIDE.md](USER_GUIDE.md) | Admin UI guide for non-technical users |
+| [CHANGELOG.md](CHANGELOG.md) | All notable changes to the system |
 
 ## Operational Guides
 
@@ -28,6 +29,7 @@
 | [LISTENER_GUIDE.md](LISTENER_GUIDE.md) | How the chart works (for listeners/DJs) |
 | [SPOTIFY_API_CALLS.md](SPOTIFY_API_CALLS.md) | Spotify API integration details |
 | [SPOTIFY_PLAYLIST_SETUP.md](SPOTIFY_PLAYLIST_SETUP.md) | Spotify playlist configuration |
+| [INFOGRAPHIC_TEMPLATE.md](INFOGRAPHIC_TEMPLATE.md) | How to modify the chart PNG template |
 
 ## AI Context Files
 

@@ -621,6 +621,7 @@ Resources:
               Resource:
                 - !Sub '${CampaignAssetsBucket.Arn}/branding/*'
                 - !Sub '${CampaignAssetsBucket.Arn}/templates/*'
+                - !Sub '${CampaignAssetsBucket.Arn}/resources/*'
             - Effect: Allow
               Action:
                 - bedrock-agentcore:InvokeAgentRuntime
@@ -791,6 +792,34 @@ Resources:
           Properties:
             Path: /api/spotify/disconnect
             Method: POST
+            RestApiId: !Ref ApiGateway
+            Auth:
+              Authorizer: CognitoAuthorizer
+        PublicLatestCampaign:
+          Type: Api
+          Properties:
+            Path: /api/public/latest-campaign
+            Method: GET
+            RestApiId: !Ref ApiGateway
+        ListResources:
+          Type: Api
+          Properties:
+            Path: /api/resources
+            Method: GET
+            RestApiId: !Ref ApiGateway
+        CreateResource:
+          Type: Api
+          Properties:
+            Path: /api/resources
+            Method: POST
+            RestApiId: !Ref ApiGateway
+            Auth:
+              Authorizer: CognitoAuthorizer
+        DeleteResource:
+          Type: Api
+          Properties:
+            Path: /api/resources/{resource_id}
+            Method: DELETE
             RestApiId: !Ref ApiGateway
             Auth:
               Authorizer: CognitoAuthorizer

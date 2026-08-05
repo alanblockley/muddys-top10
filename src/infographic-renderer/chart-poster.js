@@ -321,7 +321,7 @@ html, body {
 }
 .stats-strip {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-columns: 2fr 1fr;
   gap: 0;
   border: 1px solid rgba(168,85,247,0.4);
 }
@@ -473,11 +473,8 @@ html, body {
       </div>
       <div class="stats-strip">
         <div class="stats-strip-panel">
-          <div class="panel-title">This Week's Story</div>
-          <div class="panel-row" style="font-weight:700;color:${secondary};">${escapeHtml(data.headline || '')}</div>
-        </div>
-        <div class="stats-strip-panel">
           <div class="panel-title">Chart Story</div>
+          <div class="panel-row" style="font-weight:700;color:${secondary};">${escapeHtml(data.headline || '')}</div>
           <div class="panel-row">${escapeHtml(data.chart_story || '')}</div>
         </div>
         <div class="stats-strip-panel">

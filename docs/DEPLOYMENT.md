@@ -99,12 +99,12 @@ Deployment takes ~5-10 minutes:
    - Retrieves CloudFront distribution ID
 
 4. ⚙️  Configure Frontend
-   - Reads frontend/index.html
-   - Replaces %%API_ENDPOINT%% with actual URL
-   - Generates configured HTML
+   - Reads frontend HTML files
+   - Generates `config.js` with the current API endpoint for the public root page
+   - Injects API/Cognito settings into authenticated admin tooling
 
 5. 📤 Upload to S3
-   - Uploads configured index.html
+   - Uploads configured frontend files
    - Sets content-type and cache headers
    - Serves through CloudFront OAC
 
@@ -242,13 +242,17 @@ BUCKET_NAME=$(aws cloudformation describe-stacks \
 
 ```bash
 sed "s|%%API_ENDPOINT%%|$API_URL|g" \
-    frontend/index.html > frontend/index-configured.html
+    frontend/admin.html > frontend/admin-configured.html
 ```
+
+The public root page reads `config.js` first and uses its `apiBase` value to
+call `/api/public/latest-campaign`. This keeps the public page wired from stack
+outputs without requiring Cognito settings in `index.html`.
 
 ### Step 5: Upload to S3
 
 ```bash
-aws s3 cp frontend/index-configured.html \
+aws s3 cp frontend/index.html \
     s3://$BUCKET_NAME/index.html \
     --content-type "text/html" \
     --cache-control "max-age=300"

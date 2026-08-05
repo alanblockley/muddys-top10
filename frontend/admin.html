@@ -1968,12 +1968,73 @@
             color: #cbd5e1;
         }
 
+        .status-action-bar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 0;
+            border-top: 1px solid #1e293b;
+            margin-top: 12px;
+        }
+
+        .status-action-bar .status-label {
+            color: #94a3b8;
+            font-size: 0.85rem;
+            font-weight: 600;
+            margin-right: 4px;
+        }
+
+        .btn-status {
+            padding: 7px 14px;
+            font-size: 0.82rem;
+            font-weight: 700;
+            border: 1px solid transparent;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .btn-status-forward {
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: #ffffff;
+        }
+
+        .btn-status-forward:hover {
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+            transform: translateY(-1px);
+        }
+
+        .btn-status-back {
+            background: #1e293b;
+            color: #94a3b8;
+            border-color: #334155;
+        }
+
+        .btn-status-back:hover {
+            background: #334155;
+            color: #e4e8f0;
+        }
+
+        .btn-status-publish {
+            background: linear-gradient(135deg, #2563eb, #1d4ed8);
+            color: #ffffff;
+        }
+
+        .btn-status-publish:hover {
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4);
+            transform: translateY(-1px);
+        }
+
         @media (max-width: 900px) {
             .campaign-toolbar,
             .campaign-layout,
             .branding-logo-row,
             .font-preview-row {
                 grid-template-columns: 1fr;
+            }
+
+            .status-action-bar {
+                flex-wrap: wrap;
             }
         }
     </style>
@@ -2007,6 +2068,7 @@
                 <button class="tab-btn active" onclick="switchTab('history')">📜 History</button>
                 <button class="tab-btn" onclick="switchTab('top10')">🏆 Top 10</button>
                 <button class="tab-btn" onclick="switchTab('campaigns')">🧠 Campaigns</button>
+                <button class="tab-btn" onclick="switchTab('resources')">📦 Resources</button>
                 <button class="tab-btn" onclick="switchTab('settings')">⚙️ Settings</button>
                 <button class="tab-btn" onclick="switchTab('rawdata')">📊 Raw Data</button>
                 <button id="spotifyTabButton" class="tab-btn" onclick="switchTab('spotify')">🎵 Spotify</button>
@@ -2200,10 +2262,12 @@
                         <label><input type="checkbox" class="campaign-section" value="social" checked> Social copy</label>
                     </div>
 
-                    <div id="campaignFeedbackSummary" class="preview-block" style="margin-bottom: 16px;">
-                        <h4>Feedback Summary</h4>
-                        <p class="help-text">Open this tab to load feedback trends for prompt optimisation.</p>
-                    </div>
+                    <details style="margin-bottom: 16px;">
+                        <summary style="cursor:pointer;color:#a5b4fc;font-weight:700;font-size:0.9rem;padding:8px 0;">Feedback Summary ▾</summary>
+                        <div id="campaignFeedbackSummary" class="preview-block" style="margin-top:8px;">
+                            <p class="help-text">Expand to load feedback trends for prompt optimisation.</p>
+                        </div>
+                    </details>
 
                     <div class="campaign-layout">
                         <div>
@@ -2240,6 +2304,52 @@
                         </div>
                     </div>
 
+                </div>
+            </div>
+
+            <div id="tab-resources" class="tab-content">
+                <div class="card">
+                    <h2 style="margin-bottom: 20px;">📦 Resources</h2>
+                    <p class="help-text" style="margin-bottom: 20px;">
+                        Upload downloadable resources (jingles, stings, ads, reads) for public access. Files are grouped by category on the landing page.
+                    </p>
+
+                    <div style="background: #0a0e1a; border: 1px solid #1e293b; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
+                        <h3 style="color: #a5b4fc; margin-bottom: 15px;">Upload Resource</h3>
+                        <div class="form-group">
+                            <label for="resourceFile">File (opus, mp3, pdf)</label>
+                            <input type="file" id="resourceFile" accept=".opus,.mp3,.pdf,audio/ogg,audio/opus,audio/mpeg,application/pdf" style="color: #94a3b8;">
+                            <p class="help-text">Max 50 MB per file.</p>
+                        </div>
+                        <div class="form-group">
+                            <label for="resourceCategory">Category</label>
+                            <select id="resourceCategory">
+                                <option value="Jingle">Jingle</option>
+                                <option value="Sting">Sting</option>
+                                <option value="Ad">Ad</option>
+                                <option value="Read">Read</option>
+                                <option value="Promo">Promo</option>
+                                <option value="Imaging">Imaging</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="resourceDescription">Description</label>
+                            <input type="text" id="resourceDescription" placeholder="e.g., 5-second intro jingle for Top 10 countdown" maxlength="250">
+                        </div>
+                        <div class="form-group">
+                            <label for="resourceMetaTags">Tags (comma-separated, optional)</label>
+                            <input type="text" id="resourceMetaTags" placeholder="e.g., intro, countdown, upbeat" maxlength="200">
+                        </div>
+                        <div class="form-group">
+                            <label for="resourceMetaDuration">Duration (optional)</label>
+                            <input type="text" id="resourceMetaDuration" placeholder="e.g., 0:05, 0:30, 2:15" maxlength="10">
+                        </div>
+                        <button id="resourceUploadBtn" onclick="uploadResource()" class="btn">Upload Resource</button>
+                    </div>
+
+                    <h3 style="color: #a5b4fc; margin-bottom: 12px;">Existing Resources</h3>
+                    <div id="resourcesList" style="color: #94a3b8;">Loading resources...</div>
                 </div>
             </div>
 
@@ -2472,6 +2582,11 @@
             }
             if (tabName !== 'campaigns') {
                 stopCampaignRefreshPolling();
+            }
+
+            // Load resources if switching to resources tab
+            if (tabName === 'resources' && !window.resourcesLoaded) {
+                loadResources();
             }
         }
 
@@ -3082,13 +3197,17 @@
                         <button onclick="deleteSelectedCampaign()" class="btn btn-secondary" style="padding:8px 14px;font-size:0.85rem;background:#991b1b;">Delete</button>
                     </div>
                 </div>
+                ${renderStatusActions(status)}
 
                 <div class="campaign-split-layout">
                     <div class="campaign-left">
                         ${renderInfographicAssetPanel(campaign)}
-                        <div id="campaignFeedbackPanel" style="margin-top:12px;">
-                            <p class="help-text">Loading feedback...</p>
-                        </div>
+                        <details id="campaignFeedbackDetails" style="margin-top:12px;">
+                            <summary style="cursor:pointer;color:#a5b4fc;font-weight:700;font-size:0.9rem;padding:8px 0;">Review Feedback ▾</summary>
+                            <div id="campaignFeedbackPanel">
+                                <p class="help-text">Loading feedback...</p>
+                            </div>
+                        </details>
                     </div>
                     <div class="campaign-right">
                         <div class="campaign-content-tabs">
@@ -3483,14 +3602,14 @@
             const safeAssetType = escapeHtml(assetType);
             const textareaId = `feedback-${safeAssetType}`;
             return `
-                <div class="asset-feedback">
-                    <label for="${textareaId}">Feedback for ${escapeHtml(label)}:</label>
-                    <div class="asset-feedback-row">
+                <details class="asset-feedback">
+                    <summary style="cursor:pointer;color:#94a3b8;font-size:0.85rem;font-weight:600;padding:6px 0;">Leave feedback for ${escapeHtml(label)} ▾</summary>
+                    <div class="asset-feedback-row" style="margin-top:8px;">
                         <button onclick="submitCampaignFeedback('${safeAssetType}', 'up')" class="btn btn-secondary" type="button">👍 Good</button>
                         <button onclick="submitCampaignFeedback('${safeAssetType}', 'down')" class="btn btn-secondary" type="button">👎 Needs Work</button>
                         <textarea id="${textareaId}" placeholder="Optional context: what worked, what failed, what to improve next time."></textarea>
                     </div>
-                </div>
+                </details>
             `;
         }
 
@@ -4106,6 +4225,45 @@
             } catch (error) {
                 throw new Error(`${label} must contain valid JSON: ${error.message}`);
             }
+        }
+
+        function renderStatusActions(status) {
+            const s = (status || 'draft').toLowerCase();
+            let buttons = '';
+
+            switch (s) {
+                case 'draft':
+                    buttons = `<button class="btn-status btn-status-forward" onclick="updateCampaignStatus('reviewed')">✓ Mark Reviewed</button>`;
+                    break;
+                case 'reviewed':
+                    buttons = `
+                        <button class="btn-status btn-status-back" onclick="updateCampaignStatus('draft')">← Back to Draft</button>
+                        <button class="btn-status btn-status-forward" onclick="updateCampaignStatus('approved')">✓ Approve</button>
+                    `;
+                    break;
+                case 'approved':
+                    buttons = `
+                        <button class="btn-status btn-status-back" onclick="updateCampaignStatus('reviewed')">← Back to Reviewed</button>
+                        <button class="btn-status btn-status-publish" onclick="updateCampaignStatus('published')">🚀 Publish</button>
+                    `;
+                    break;
+                case 'published':
+                    buttons = `<button class="btn-status btn-status-back" onclick="updateCampaignStatus('approved')">← Unpublish</button>`;
+                    break;
+                case 'processing':
+                case 'failed':
+                    buttons = '';
+                    break;
+            }
+
+            if (!buttons) return '';
+
+            return `
+                <div class="status-action-bar">
+                    <span class="status-label">Status:</span>
+                    ${buttons}
+                </div>
+            `;
         }
 
         async function updateCampaignStatus(status) {
@@ -5163,6 +5321,232 @@
             const div = document.createElement('div');
             div.textContent = text;
             return div.innerHTML;
+        }
+
+        // ---------------------------------------------------------------------------
+        // Resources Management
+        // ---------------------------------------------------------------------------
+
+        window.resourcesLoaded = false;
+
+        const RESOURCE_MIME_MAP = {
+            'opus': 'audio/ogg',
+            'mp3': 'audio/mpeg',
+            'pdf': 'application/pdf',
+        };
+
+        function getResourceContentType(file) {
+            const ext = (file.name || '').split('.').pop().toLowerCase();
+            if (ext === 'opus') return 'audio/ogg';
+            if (ext === 'mp3') return 'audio/mpeg';
+            if (ext === 'pdf') return 'application/pdf';
+            return file.type || '';
+        }
+
+        async function loadResources() {
+            const container = document.getElementById('resourcesList');
+            container.innerHTML = '<div class="loading" style="display:block;">Loading resources...</div>';
+
+            try {
+                const response = await fetch(`${CONFIG.apiEndpoint}/resources`);
+                if (!response.ok) throw new Error('Failed to load resources');
+                const data = await response.json();
+                window.resourcesLoaded = true;
+                renderResourcesList(data.resources || []);
+            } catch (error) {
+                container.innerHTML = `<div class="error-message" style="display:block;">Failed to load resources: ${escapeHtml(error.message)}</div>`;
+            }
+        }
+
+        function renderResourcesList(resources) {
+            const container = document.getElementById('resourcesList');
+            if (!resources.length) {
+                container.innerHTML = '<p style="color: #94a3b8;">No resources uploaded yet.</p>';
+                return;
+            }
+
+            // Group by category
+            const grouped = {};
+            resources.forEach(r => {
+                const cat = r.category || 'Other';
+                if (!grouped[cat]) grouped[cat] = [];
+                grouped[cat].push(r);
+            });
+
+            const categoryOrder = ['Jingle', 'Sting', 'Ad', 'Read', 'Promo', 'Imaging', 'Other'];
+            const sortedCategories = categoryOrder.filter(c => grouped[c]);
+
+            let html = '';
+            for (const category of sortedCategories) {
+                const items = grouped[category];
+                html += `<div style="margin-bottom: 16px;">
+                    <h4 style="color: #facc15; margin-bottom: 8px; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.05em;">${escapeHtml(category)} (${items.length})</h4>`;
+                for (const r of items) {
+                    const ext = (r.filename || '').split('.').pop().toUpperCase();
+                    const size = r.size_bytes ? formatFileSize(r.size_bytes) : '';
+                    const tags = r.metadata && r.metadata.tags ? r.metadata.tags : '';
+                    const duration = r.metadata && r.metadata.duration ? r.metadata.duration : '';
+                    html += `
+                        <div style="display: flex; align-items: center; gap: 12px; padding: 10px 12px; background: #0a0e1a; border: 1px solid #1e293b; border-radius: 8px; margin-bottom: 8px;">
+                            <span style="background: #1e293b; color: #a5b4fc; padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 700;">${escapeHtml(ext)}</span>
+                            <div style="flex: 1; min-width: 0;">
+                                <div style="color: #e4e8f0; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(r.filename || 'Unknown')}</div>
+                                <div style="color: #94a3b8; font-size: 0.85rem;">${escapeHtml(r.description || '')}${duration ? ` · ${escapeHtml(duration)}` : ''}${size ? ` · ${size}` : ''}</div>
+                                ${tags ? `<div style="color: #64748b; font-size: 0.8rem; margin-top: 2px;">Tags: ${escapeHtml(tags)}</div>` : ''}
+                            </div>
+                            <div style="display: flex; gap: 6px;">
+                                ${r.url ? `<a href="${escapeHtml(r.url)}" class="btn btn-secondary" style="padding: 6px 10px; font-size: 0.8rem;" download>↓</a>` : ''}
+                                <button onclick="deleteResource('${escapeHtml(r.id)}')" class="btn btn-secondary" style="padding: 6px 10px; font-size: 0.8rem; background: #991b1b;">✕</button>
+                            </div>
+                        </div>
+                    `;
+                }
+                html += '</div>';
+            }
+            container.innerHTML = html;
+        }
+
+        async function uploadResource() {
+            const fileInput = document.getElementById('resourceFile');
+            const category = document.getElementById('resourceCategory').value;
+            const description = document.getElementById('resourceDescription').value.trim();
+            const tags = document.getElementById('resourceMetaTags').value.trim();
+            const duration = document.getElementById('resourceMetaDuration').value.trim();
+            const btn = document.getElementById('resourceUploadBtn');
+
+            const file = fileInput.files && fileInput.files[0];
+            if (!file) {
+                showError('Please select a file to upload.');
+                return;
+            }
+            if (!description) {
+                showError('Please enter a description for the resource.');
+                return;
+            }
+
+            const contentType = getResourceContentType(file);
+            if (!contentType || !['audio/ogg', 'audio/opus', 'audio/mpeg', 'audio/mp3', 'application/pdf'].includes(contentType)) {
+                showError('File type not supported. Please upload .opus, .mp3, or .pdf files.');
+                return;
+            }
+
+            if (file.size > 50 * 1024 * 1024) {
+                showError('File exceeds maximum size of 50 MB.');
+                return;
+            }
+
+            btn.disabled = true;
+            btn.textContent = 'Getting upload URL...';
+            showLoading();
+
+            try {
+                // Step 1: Get presigned upload URL
+                const presignResponse = await fetch(`${CONFIG.apiEndpoint}/resources`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': accessToken,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        action: 'presign',
+                        filename: file.name,
+                        content_type: contentType,
+                        category: category,
+                        description: description,
+                    })
+                });
+
+                if (!presignResponse.ok) {
+                    const err = await presignResponse.json().catch(() => ({}));
+                    throw new Error(err.error || `Failed to get upload URL (${presignResponse.status})`);
+                }
+
+                const presignData = await presignResponse.json();
+
+                // Step 2: Upload to S3
+                btn.textContent = 'Uploading file...';
+                const uploadResponse = await fetch(presignData.upload_url, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': contentType },
+                    body: file
+                });
+
+                if (!uploadResponse.ok) {
+                    throw new Error(`File upload failed (${uploadResponse.status})`);
+                }
+
+                // Step 3: Register the resource
+                btn.textContent = 'Registering...';
+                const metadata = {};
+                if (tags) metadata.tags = tags;
+                if (duration) metadata.duration = duration;
+
+                const registerResponse = await fetch(`${CONFIG.apiEndpoint}/resources`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': accessToken,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        action: 'register',
+                        resource_id: presignData.resource_id,
+                        s3_key: presignData.s3_key,
+                        filename: file.name,
+                        content_type: contentType,
+                        category: category,
+                        description: description,
+                        metadata: metadata,
+                    })
+                });
+
+                if (!registerResponse.ok) {
+                    const err = await registerResponse.json().catch(() => ({}));
+                    throw new Error(err.error || `Registration failed (${registerResponse.status})`);
+                }
+
+                // Reset form
+                fileInput.value = '';
+                document.getElementById('resourceDescription').value = '';
+                document.getElementById('resourceMetaTags').value = '';
+                document.getElementById('resourceMetaDuration').value = '';
+
+                showSuccess('Resource uploaded successfully!');
+                loadResources();
+            } catch (error) {
+                showError('Failed to upload resource: ' + error.message);
+            } finally {
+                hideLoading();
+                btn.disabled = false;
+                btn.textContent = 'Upload Resource';
+            }
+        }
+
+        async function deleteResource(resourceId) {
+            if (!confirm('Delete this resource? The file will be permanently removed.')) return;
+
+            showLoading();
+            try {
+                const response = await fetch(`${CONFIG.apiEndpoint}/resources/${encodeURIComponent(resourceId)}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': accessToken }
+                });
+                if (!response.ok) {
+                    const err = await response.json().catch(() => ({}));
+                    throw new Error(err.error || 'Delete failed');
+                }
+                showSuccess('Resource deleted.');
+                loadResources();
+            } catch (error) {
+                showError('Failed to delete resource: ' + error.message);
+            } finally {
+                hideLoading();
+            }
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
         }
 
         window.addEventListener('resize', fitInfographicPreview);

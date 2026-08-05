@@ -4,17 +4,28 @@ This guide covers everything you need to manage the Muddy's Top 10 system: viewi
 
 ---
 
+## Public Welcome Page
+
+Opening the site's root CloudFront URL, such as `https://d1234abcdef.cloudfront.net/`, shows the latest published chart PNG for Muddy's Top 10. This page is public and does not require sign-in.
+
+The public page also includes:
+- A direct **PNG download link** for the current chart image
+- A **Resources** section showing station resources (audio files, PDFs) grouped by category in a two-column responsive grid
+
+> **Note:** Only campaigns with **Published** status appear on the public page. Draft, reviewed, and approved campaigns are only visible in the admin panel.
+
 ## Accessing the Admin Panel
 
 1. Open your site's CloudFront URL and add `/admin.html` to the end (e.g. `https://d1234abcdef.cloudfront.net/admin.html`).
 2. Sign in with your username and password (provided by whoever set up your account).
 3. Once logged in, you'll see the navigation bar across the top:
 
-| History | Campaigns | Settings | Raw Data | Spotify |
-|---------|-----------|----------|----------|---------|
+| History | Campaigns | Resources | Settings | Raw Data | Spotify |
+|---------|-----------|-----------|----------|----------|---------|
 
 - **History** — recent tracks detected from the stream
 - **Campaigns** — weekly promotional content (radio reads, social posts, infographics)
+- **Resources** — upload and manage station resources (jingles, stings, ads, etc.)
 - **Settings** — chart schedule, filters, branding, and validation options
 - **Raw Data** — low-level track data for troubleshooting
 - **Spotify** — Spotify integration management
@@ -46,6 +57,23 @@ Click **Regenerate** to create a new revision of the campaign. The system rememb
 **Quick feedback:**
 While viewing a campaign, use the thumbs up/down buttons on the infographic. Your response is saved and used to guide future generations.
 
+### Campaign Status Workflow
+
+Each campaign progresses through a defined workflow:
+
+```
+Draft → Reviewed → Approved → Published
+```
+
+| Status | Meaning |
+|--------|---------|
+| **Draft** | Freshly generated, not yet reviewed |
+| **Reviewed** | Reviewer has seen it and provided feedback |
+| **Approved** | Content signed off, ready for publication |
+| **Published** | Live on the public page |
+
+Action buttons appear at the top of the campaign view to advance the status. Only **Published** campaigns appear on the public-facing page.
+
 ---
 
 ## Generating a Campaign
@@ -66,6 +94,38 @@ While viewing a campaign, use the thumbs up/down buttons on the infographic. You
 4. Everything is saved and appears in the campaign list.
 
 You'll see animated dots while generation is in progress. This typically takes 30–60 seconds.
+
+---
+
+## Resources
+
+The Resources tab lets you upload and manage station assets — jingles, stings, ads, radio reads, promos, imaging elements, and other files.
+
+### Uploading a Resource
+
+1. Go to the **Resources** tab.
+2. Click **Upload Resource**.
+3. Choose a file (supported formats: `.opus`, `.mp3`, `.pdf`).
+4. Select a **category**:
+   - Jingle
+   - Sting
+   - Ad
+   - Read
+   - Promo
+   - Imaging
+   - Other
+5. Add a **description** (optional but recommended).
+6. Click **Upload**.
+
+### Managing Resources
+
+- Resources are listed with their category, filename, and description.
+- Click the **delete** button to remove a resource.
+- Resources are stored in S3 under the `resources/` prefix and metadata is kept in the Config table.
+
+### Public Display
+
+Uploaded resources appear on the public landing page, grouped by category in a two-column responsive grid. Visitors can browse and access station resources without signing in.
 
 ---
 
@@ -121,6 +181,8 @@ When both are enabled, the system checks MusicBrainz first, then Spotify as a fa
 
 The system learns from your feedback over time.
 
+Feedback sections are **collapsible** — click the disclosure triangle to expand or collapse feedback history on a campaign.
+
 **How to give feedback:**
 
 1. Open any campaign from the list.
@@ -149,7 +211,7 @@ Each campaign includes a generated infographic image.
 **What's on it:**
 - Chart table showing all 10 tracks with rankings and movement arrows
 - Chart Talk — 6 editorial commentary boxes highlighting notable movers and trends
-- Stats summary (total plays, new entries, biggest mover)
+- Stats strip — 2 panels: Chart Story (narrative) and This Week's Stats (new entries, climbers, fallers, non-movers)
 - Footer with branding
 
 **Downloading:**
